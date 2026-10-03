@@ -70,12 +70,25 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Convertir / parser une tonalité (`Fm`, `8A`, note + mode) | `app/domain/camelot.py` → `CamelotKey.parse`, `.from_pitch`, `.parallel()` |
 | Contrat d'un service musical | `app/domain/music_provider.py` → `MusicProvider`, `ProviderTrack`, `ProviderPlaylist` |
 | Requêtes SQL | `app/adapters/db.py` → `Database.fetch_all` / `fetch_one` (depuis un dépôt uniquement) |
-| Morceaux en base | `app/adapters/track_repository.py` → `TrackRepository` |
+| Plusieurs écritures atomiques | `Database.transaction()` → objet `Transaction` ; les dépôts acceptent un `Queryable` (base ou transaction) |
+| Morceaux en base | `app/adapters/track_repository.py` → `TrackRepository` (dont `find_by_isrc`, `find_by_external_id`, `set_artists`) |
+| Utilisateurs, comptes musicaux | `app/adapters/user_repository.py` → `UserRepository` |
+| Sessions de connexion | `app/services/sessions.py` → `SessionService` (dépôt : `SessionRepository`) |
+| Playlists en base | `app/adapters/playlist_repository.py` → `PlaylistRepository` |
+| Journal des imports | `app/adapters/import_job_repository.py` → `ImportJobRepository` |
+| Appel HTTP vers une API externe | `app/adapters/http_retry.py` → `request_with_retry` (gère les 429 / `Retry-After`) |
+| Chiffrer un jeton avant stockage | `app/adapters/token_cipher.py` → `TokenCipher` (clé `TOKEN_ENCRYPTION_KEY`) |
+| Jeton Spotify valide pour un utilisateur | `app/services/spotify_connection.py` → `SpotifyConnection.access_token(user_id)` |
+| Lire Spotify | `app/adapters/spotify_provider.py` → `SpotifyProvider` |
+| Importer une playlist | `app/services/playlist_import.py` → `PlaylistImporter` |
 | Lancer une analyse | `app/adapters/queue.py` → `TaskQueue.enqueue_analysis` (déjà dédoublonné) |
-| Dépendances de route | `app/api/deps.py` → `get_db`, `get_queue`, `get_track_repository` |
+| Dépendances de route | `app/api/deps.py` → `get_db`, `get_queue`, `get_track_repository`, `get_current_user_id` (exige une session) |
+| Erreur de service musical → HTTP | `app/api/errors.py` (404 / 401 / 502, déjà branché) |
 | Valeur BPM/tonalité à afficher | SQL `effective_features(user)` |
 | Morceaux compatibles | SQL `suggest_tracks(user, seed, tolerance, limit)` |
-| Styles | `web/src/styles/_tokens.scss`, `_mixins.scss` (`page`, `panel`, `status`, `reset-list`, `button-primary`, `focus-ring`, `text-muted`) |
+| Styles | `web/src/styles/_tokens.scss`, `_mixins.scss` (`page`, `panel`, `status`, `reset-list`, `button-primary`, `focus-ring`, `text-muted`, `text-danger`) |
+| Message d'erreur d'API (front) | `web/src/app/core/api/api-error.ts` → `apiErrorMessage` |
+| Session côté front | `web/src/app/core/api/auth.service.ts` → `AuthService`, `SPOTIFY_LOGIN_URL` |
 
 Tenir ce tableau à jour quand on ajoute un élément réutilisable.
 
@@ -85,7 +98,7 @@ Tout tourne dans Docker. Sur la machine de dev (Chromebook / Crostini), **`DOCKE
 (le Makefile l'exporte).
 
 ```bash
-make up          # construit et démarre tout — front :4200, API :8000/docs
+make up          # construit et démarre tout — front http://127.0.0.1:4200, API :8000/docs
 make test        # tests back (pytest) + front (vitest)
 make lint        # ruff check + ruff format --check (dont docstrings)
 make logs | make down | make psql
@@ -156,6 +169,14 @@ vide**. Nouveau fichier numéroté, puis `make reset-db` en dev.
 - « address already in use » au `make up` : changer `DB_PORT`, `REDIS_PORT`, `API_PORT` ou `WEB_PORT` dans `.env`
   (sur la machine de dev, `DB_PORT=5433`). Entre conteneurs, les ports internes ne changent pas.
 - Ruff ne vérifie pas les docstrings dans un module dont le nom commence par `_`.
+- **Front sur `http://127.0.0.1:4200`, jamais `localhost`** : la redirect URI Spotify et le cookie de session en
+  dépendent. L'OAuth passe par le proxy Angular (`/api/auth/spotify/callback`) pour que front et API partagent
+  la même origine.
+- **Artistes dédoublonnés par nom** (`lower(name)`) : deux homonymes sont fusionnés (on ne stocke pas l'ID
+  Spotify des artistes).
+- **Prettier** : ne pas le lancer sur tout `web/src`, il reformate des fichiers existants. Le cibler sur les
+  fichiers modifiés.
+- Changer `TOKEN_ENCRYPTION_KEY` rend les jetons stockés illisibles : il faut se reconnecter à Spotify.
 - Le worker exécute peu de tâches en parallèle (`max_jobs = 2`) : Essentia est gourmand en CPU.
 
 ## Analyse audio (résultats des spikes, voir spikes/README.md)
@@ -169,8 +190,9 @@ vide**. Nouveau fichier numéroté, puis `make reset-db` en dev.
 
 ## Feuille de route V1
 
-Fait : spikes, schéma, squelette (Compose, API, worker, front, CI), règles de code.
-À faire, dans l'ordre : OAuth Spotify + import des playlists → worker Deezer + Essentia → catalogue filtrable,
+Fait : spikes, schéma, squelette (Compose, API, worker, front, CI), règles de code, OAuth Spotify + import des
+playlists.
+À faire, dans l'ordre : worker Deezer + Essentia → catalogue filtrable,
 suggestions, playlists, favoris → export Spotify / TXT / M3U → import XML rekordbox (avec écran des morceaux
 non reconnus) et corrections manuelles.
 

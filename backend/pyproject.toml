@@ -10,6 +10,7 @@ dependencies = [
     "pydantic-settings==2.15.0",
     "arq==0.28.0",
     "httpx==0.28.1",
+    "cryptography==50.0.2",  # chiffrement des jetons Spotify en base (Fernet)
 ]
 
 [project.optional-dependencies]

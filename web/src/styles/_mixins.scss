@@ -49,14 +49,16 @@
   }
 }
 
-/// Bouton principal.
+/// Bouton principal (fonctionne aussi sur un lien <a>).
 @mixin button-primary {
+  display: inline-block;
   padding: t.$space-2 t.$space-4;
   border: none;
   border-radius: t.$radius-md;
   background: var(--color-primary);
   color: var(--color-primary-contrast);
   font: inherit;
+  text-decoration: none;
   cursor: pointer;
   @include focus-ring;
 
@@ -69,4 +71,9 @@
 /// Texte secondaire, moins contrasté.
 @mixin text-muted {
   color: var(--color-text-muted);
+}
+
+/// Texte d'erreur.
+@mixin text-danger {
+  color: var(--color-danger-text);
 }

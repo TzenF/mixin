@@ -15,7 +15,14 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:4200"]
 
     spotify_client_id: str = ""
-    spotify_redirect_uri: str = "http://127.0.0.1:8000/auth/spotify/callback"
+    # Passe par le proxy Angular : front et API partagent la même origine, donc le cookie de session.
+    spotify_redirect_uri: str = "http://127.0.0.1:4200/api/auth/spotify/callback"
+
+    # Clé Fernet qui chiffre les jetons des services musicaux en base (voir .env.example).
+    token_encryption_key: str = ""
+    session_days: int = 30
+    # True dès que l'application est servie en HTTPS ; False en dev (http://127.0.0.1).
+    session_cookie_secure: bool = False
 
 
 @lru_cache

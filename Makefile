@@ -6,7 +6,7 @@ COMPOSE := docker compose
 
 up:            ## Construit et démarre tout (front, API, worker, base, Redis)
 	$(COMPOSE) up --build -d
-	@echo "Front : http://localhost:4200   API : http://localhost:8000/docs"
+	@echo "Front : http://127.0.0.1:4200   API : http://127.0.0.1:8000/docs"
 
 down:          ## Arrête tout (les données de la base sont conservées)
 	$(COMPOSE) down

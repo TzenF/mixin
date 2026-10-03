@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { Health, HealthService } from '../../core/api/health.service';
 
 type State =
@@ -10,6 +11,7 @@ type State =
 /** Page d'accueil provisoire : affiche l'état de la base et de la file de tâches. */
 @Component({
   selector: 'app-status-page',
+  imports: [RouterLink],
   templateUrl: './status.page.html',
   styleUrl: './status.page.scss',
 })

@@ -1,6 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { StatusPage } from './status.page';
 
 describe('StatusPage', () => {
@@ -15,7 +16,7 @@ describe('StatusPage', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [StatusPage],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
     http = TestBed.inject(HttpTestingController);
   });

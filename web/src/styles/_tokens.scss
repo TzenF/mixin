@@ -18,10 +18,18 @@ $radius-sm: 0.25rem;
 $radius-md: 0.375rem;
 $radius-lg: 0.75rem;
 
+// --- Bordures ---
+$border-width: 1px;
+
 // --- Typographie ---
-$font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+$font-family:
+  system-ui,
+  -apple-system,
+  'Segoe UI',
+  sans-serif;
 $font-size-sm: 0.875rem;
 $font-size-md: 1rem;
+$font-weight-bold: 600;
 
 // --- Largeurs ---
 $width-narrow: 32rem;

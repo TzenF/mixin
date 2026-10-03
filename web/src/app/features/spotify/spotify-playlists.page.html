@@ -1,0 +1,66 @@
+<main>
+  <h1>Mes playlists Spotify</h1>
+
+  @if (loginError; as message) {
+    <p class="error" data-testid="login-error">{{ message }}</p>
+  }
+
+  @switch (state().kind) {
+    @case ('loading') {
+      <p data-testid="loading">Chargement…</p>
+    }
+    @case ('disconnected') {
+      <p class="hint">Connecte ton compte Spotify pour voir tes playlists et les importer.</p>
+      <a class="button" [href]="loginUrl" data-testid="connect-spotify">Connecter Spotify</a>
+    }
+    @case ('error') {
+      <p class="error" data-testid="error">{{ errorMessage() }}</p>
+      <button type="button" (click)="load()">Réessayer</button>
+    }
+  }
+
+  @if (playlists(); as playlists) {
+    <p class="hint">Seules les playlists dont tu es propriétaire sont listées.</p>
+    <ul data-testid="playlists">
+      @for (playlist of playlists; track playlist.id) {
+        <li [attr.data-testid]="'playlist-' + playlist.id">
+          <div class="row">
+            <div>
+              <span class="name">{{ playlist.name }}</span>
+              <span class="meta">
+                {{ playlist.track_count }} titre{{ playlist.track_count > 1 ? 's' : '' }}
+                @if (playlist.imported) {
+                  · déjà importée
+                }
+              </span>
+            </div>
+            <button
+              type="button"
+              [disabled]="isImporting(playlist.id)"
+              (click)="importPlaylist(playlist)"
+              data-testid="import"
+            >
+              {{
+                isImporting(playlist.id) ? 'Import…' : playlist.imported ? 'Réimporter' : 'Importer'
+              }}
+            </button>
+          </div>
+
+          @if (outcomeOf(playlist.id); as o) {
+            <p class="result" data-testid="import-result">
+              {{ o.total }} titres : {{ o.new }} nouveaux, {{ o.known }} déjà connus,
+              {{ o.skipped }} ignorés · {{ o.queued }} mis en file d'analyse
+            </p>
+          } @else if (importErrorOf(playlist.id); as message) {
+            <p class="error" data-testid="import-error">{{ message }}</p>
+          }
+        </li>
+      } @empty {
+        <li class="hint" data-testid="no-playlist">Aucune playlist dont tu es propriétaire.</li>
+      }
+    </ul>
+    <button type="button" class="secondary" (click)="logout()" data-testid="logout">
+      Se déconnecter
+    </button>
+  }
+</main>

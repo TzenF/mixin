@@ -1,6 +1,6 @@
 # Environnement de développement complet.
 #   make up      (ou : DOCKER_BUILDKIT=0 docker compose up --build)
-# Front : http://localhost:4200   API : http://localhost:8000/docs
+# Front : http://127.0.0.1:4200 (pas localhost : cookie de session et OAuth Spotify)   API : http://127.0.0.1:8000/docs
 # Ports côté machine modifiables dans .env (DB_PORT, REDIS_PORT, API_PORT, WEB_PORT).
 
 name: dj-platform
@@ -42,6 +42,9 @@ services:
       DATABASE_URL: postgresql://dj:dj@db:5432/dj
       REDIS_URL: redis://redis:6379/0
       SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
+      SPOTIFY_REDIRECT_URI: ${SPOTIFY_REDIRECT_URI:-http://127.0.0.1:4200/api/auth/spotify/callback}
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
     volumes:
       - ./backend/app:/app/app
       - ./backend/tests:/app/tests
