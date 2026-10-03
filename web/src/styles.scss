@@ -1,0 +1,14 @@
+// Styles globaux : thème et base. Le reste vit dans les composants, via les mixins (src/styles/_mixins.scss).
+@use 'tokens' as t;
+
+:root {
+  @include t.theme-light;
+}
+
+body {
+  margin: 0;
+  font-family: t.$font-family;
+  font-size: t.$font-size-md;
+  color: var(--color-text);
+  background: var(--color-bg);
+}

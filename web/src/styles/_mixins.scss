@@ -1,0 +1,72 @@
+// Mixins partagés. Avant d'écrire du style dans un composant, chercher ici s'il existe déjà ;
+// si un motif apparaît dans deux composants, il devient un mixin ici.
+//
+// Utilisation dans un composant :  @use 'mixins' as m;   puis   @include m.panel;
+
+@use 'tokens' as t;
+
+/// Conteneur de page centré, avec marges latérales sur mobile.
+/// @param $max-width largeur maximale du contenu
+@mixin page($max-width: t.$width-page) {
+  max-width: $max-width;
+  margin: t.$space-16 auto;
+  padding: 0 t.$space-4;
+}
+
+/// Bloc encadré (carte, ligne de liste...).
+@mixin panel {
+  padding: t.$space-2 t.$space-3;
+  border-radius: t.$radius-md;
+  background: var(--color-bg);
+}
+
+/// Couleurs d'état : success | danger.
+/// @param $kind type d'état
+@mixin status($kind) {
+  @if $kind == success {
+    background: var(--color-success-bg);
+    color: var(--color-success-text);
+  } @else if $kind == danger {
+    background: var(--color-danger-bg);
+    color: var(--color-danger-text);
+  } @else {
+    @error "status(): état inconnu « #{$kind} » (attendu : success | danger)";
+  }
+}
+
+/// Liste sans puces ni retrait.
+@mixin reset-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/// Contour visible au clavier uniquement (accessibilité).
+@mixin focus-ring {
+  &:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+}
+
+/// Bouton principal.
+@mixin button-primary {
+  padding: t.$space-2 t.$space-4;
+  border: none;
+  border-radius: t.$radius-md;
+  background: var(--color-primary);
+  color: var(--color-primary-contrast);
+  font: inherit;
+  cursor: pointer;
+  @include focus-ring;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+/// Texte secondaire, moins contrasté.
+@mixin text-muted {
+  color: var(--color-text-muted);
+}

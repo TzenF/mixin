@@ -1,0 +1,43 @@
+// Jetons de design : la SEULE source des couleurs, espacements, rayons et polices.
+// Les composants n'écrivent jamais de valeur en dur (#fff, 12px...) : ils utilisent ces variables.
+//
+// Les couleurs sont des variables CSS (--color-*) pour pouvoir changer de thème (sombre) sans recompiler.
+// Les espacements et rayons sont des variables SCSS : elles servent dans les calculs et les mixins.
+
+// --- Espacements (échelle de 4 px) ---
+$space-1: 0.25rem;
+$space-2: 0.5rem;
+$space-3: 0.75rem;
+$space-4: 1rem;
+$space-6: 1.5rem;
+$space-8: 2rem;
+$space-16: 4rem;
+
+// --- Rayons ---
+$radius-sm: 0.25rem;
+$radius-md: 0.375rem;
+$radius-lg: 0.75rem;
+
+// --- Typographie ---
+$font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+$font-size-sm: 0.875rem;
+$font-size-md: 1rem;
+
+// --- Largeurs ---
+$width-narrow: 32rem;
+$width-page: 72rem;
+
+// --- Couleurs (thème clair) : appliquées sur :root dans styles.scss ---
+@mixin theme-light {
+  --color-bg: #ffffff;
+  --color-text: #1d1d1f;
+  --color-text-muted: #666666;
+  --color-border: #d9d9de;
+  --color-primary: #5b3cc4;
+  --color-primary-contrast: #ffffff;
+  --color-success-bg: #e7f6ec;
+  --color-success-text: #11643a;
+  --color-danger-bg: #fde8e8;
+  --color-danger-text: #b42318;
+  --color-focus: #5b3cc4;
+}

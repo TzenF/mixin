@@ -1,0 +1,21 @@
+<main>
+  <h1>DJ Platform</h1>
+  <p class="subtitle">État des services</p>
+
+  @if (health(); as health) {
+    <ul data-testid="services">
+      <li [class.ok]="health.database" [class.ko]="!health.database">
+        Base de données : {{ health.database ? 'OK' : 'en panne' }}
+      </li>
+      <li [class.ok]="health.queue" [class.ko]="!health.queue">
+        File de tâches : {{ health.queue ? 'OK' : 'en panne' }}
+      </li>
+    </ul>
+  } @else if (errorMessage(); as message) {
+    <p class="error" data-testid="error">{{ message }}</p>
+  } @else {
+    <p data-testid="loading">Vérification…</p>
+  }
+
+  <button type="button" (click)="refresh()">Revérifier</button>
+</main>

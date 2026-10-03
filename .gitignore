@@ -1,0 +1,21 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node / Angular
+node_modules/
+dist/
+.angular/
+
+# Données des tests de faisabilité (contiennent le jeton Spotify)
+spikes/**/data/
+
+# Divers
+.DS_Store

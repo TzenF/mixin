@@ -1,0 +1,80 @@
+# Environnement de développement complet.
+#   make up      (ou : DOCKER_BUILDKIT=0 docker compose up --build)
+# Front : http://localhost:4200   API : http://localhost:8000/docs
+# Ports côté machine modifiables dans .env (DB_PORT, REDIS_PORT, API_PORT, WEB_PORT).
+
+name: dj-platform
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dj
+      POSTGRES_PASSWORD: dj
+      POSTGRES_DB: dj
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      # Exécuté UNIQUEMENT au premier démarrage (volume vide). Après un changement : make reset-db
+      - ./db/migrations:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dj -d dj"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: ./backend
+      target: api
+    environment: &backend-env
+      DATABASE_URL: postgresql://dj:dj@db:5432/dj
+      REDIS_URL: redis://redis:6379/0
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/tests:/app/tests
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  worker:
+    build:
+      context: ./backend
+      target: worker
+    environment: *backend-env
+    volumes:
+      - ./backend/app:/app/app
+    command: ["arq", "app.worker.main.WorkerSettings", "--watch", "app"]
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  web:
+    build: ./web
+    environment:
+      API_URL: http://api:8000
+    volumes:
+      - ./web:/app
+      - /app/node_modules   # garde les dépendances installées dans l'image
+    ports:
+      - "${WEB_PORT:-4200}:4200"
+    depends_on:
+      - api
+
+volumes:
+  db-data:

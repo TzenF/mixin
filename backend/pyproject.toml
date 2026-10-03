@@ -1,0 +1,41 @@
+[project]
+name = "dj-platform-backend"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi==0.142.2",
+    "uvicorn[standard]==0.54.0",
+    "psycopg[binary]==3.3.6",
+    "psycopg-pool==3.3.3",
+    "pydantic-settings==2.15.0",
+    "arq==0.28.0",
+    "httpx==0.28.1",
+]
+
+[project.optional-dependencies]
+# Uniquement dans l'image du worker : Essentia est lourd et inutile pour l'API.
+worker = ["essentia==2.1b6.dev1389"]
+dev = ["pytest==9.1.1", "ruff==0.16.10"]
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py313"
+
+[tool.ruff.lint]
+# D101-D103 : docstring obligatoire sur chaque classe, méthode et fonction publique (règle du projet).
+# D417 non activé : une phrase simple suffit, pas besoin de documenter chaque paramètre.
+select = ["E", "F", "I", "B", "UP", "SIM", "D101", "D102", "D103"]
+
+[tool.ruff.lint.per-file-ignores]
+# Le nom d'un test décrit déjà ce qu'il vérifie.
+"tests/test_*.py" = ["D103"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

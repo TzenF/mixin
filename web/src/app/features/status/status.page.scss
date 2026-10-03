@@ -1,0 +1,35 @@
+@use 'mixins' as m;
+@use 'tokens' as t;
+
+main {
+  @include m.page(t.$width-narrow);
+}
+
+.subtitle {
+  @include m.text-muted;
+}
+
+ul {
+  @include m.reset-list;
+}
+
+li {
+  @include m.panel;
+  margin-bottom: t.$space-2;
+
+  &.ok {
+    @include m.status(success);
+  }
+
+  &.ko {
+    @include m.status(danger);
+  }
+}
+
+.error {
+  color: var(--color-danger-text);
+}
+
+button {
+  @include m.button-primary;
+}
