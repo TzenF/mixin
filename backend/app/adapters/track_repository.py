@@ -3,9 +3,51 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 from uuid import UUID
 
 from app.adapters.db import Queryable
+from app.domain.camelot import CamelotKey
+
+CatalogSort = Literal["title", "bpm", "key"]
+
+
+@dataclass(frozen=True, slots=True)
+class CatalogFilters:
+    """Filtres du catalogue ; None = pas de filtre sur ce critère."""
+
+    only_mine: bool = True  # False : tous les morceaux de la base
+    text: str | None = None  # dans le titre ou le nom d'un artiste
+    bpm_min: float | None = None
+    bpm_max: float | None = None
+    key: CamelotKey | None = None
+    status: str | None = None
+    sort: CatalogSort = "title"
+    limit: int = 50
+    offset: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class CatalogRow:
+    """Un morceau du catalogue, avec les valeurs affichées (voir effective_features)."""
+
+    id: UUID
+    title: str
+    artists: list[str]
+    bpm: float | None
+    camelot: str | None
+    bpm_source: str | None
+    key_source: str | None
+    key_confidence: float | None
+    analysis_status: str
+
+
+@dataclass(frozen=True, slots=True)
+class CatalogPage:
+    """Une page du catalogue et le nombre total de morceaux qui passent les filtres."""
+
+    total: int
+    items: list[CatalogRow]
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,6 +71,49 @@ FROM suggest_tracks(%(user_id)s::uuid, %(seed)s::uuid, %(tolerance)s::numeric, %
 JOIN track t ON t.id = s.track_id
 ORDER BY s.score DESC
 """
+
+
+# Morceaux filtrés, avec leurs valeurs affichées. « Mes morceaux » = ceux de mes playlists.
+_CATALOG_FROM = """
+FROM track t
+LEFT JOIN effective_features(%(user_id)s::uuid) f ON f.track_id = t.id
+WHERE (NOT %(only_mine)s OR EXISTS (
+          SELECT 1 FROM playlist_item pi JOIN playlist p ON p.id = pi.playlist_id
+          WHERE pi.track_id = t.id AND p.owner_id = %(user_id)s::uuid))
+  AND (%(text)s::text IS NULL OR t.title ILIKE %(text)s OR EXISTS (
+          SELECT 1 FROM track_artist ta JOIN artist a ON a.id = ta.artist_id
+          WHERE ta.track_id = t.id AND a.name ILIKE %(text)s))
+  AND (%(bpm_min)s::numeric IS NULL OR f.bpm >= %(bpm_min)s::numeric)
+  AND (%(bpm_max)s::numeric IS NULL OR f.bpm <= %(bpm_max)s::numeric)
+  AND (%(key_num)s::smallint IS NULL
+       OR (f.camelot_num = %(key_num)s::smallint AND f.camelot_letter::text = %(key_letter)s::text))
+  AND (%(status)s::analysis_status IS NULL OR t.analysis_status = %(status)s::analysis_status)
+"""
+
+_CATALOG_SELECT = """
+SELECT t.id, t.title,
+       COALESCE((SELECT array_agg(a.name ORDER BY ta.position)
+                 FROM track_artist ta JOIN artist a ON a.id = ta.artist_id
+                 WHERE ta.track_id = t.id), '{}') AS artists,
+       f.bpm::float AS bpm,
+       f.camelot_num || f.camelot_letter AS camelot,
+       f.bpm_source::text AS bpm_source, f.key_source::text AS key_source,
+       f.key_confidence::float AS key_confidence,
+       t.analysis_status::text AS analysis_status
+"""
+
+# Liste fermée : le tri est inséré tel quel dans le SQL, jamais une valeur venue de la requête HTTP.
+_CATALOG_ORDER: dict[CatalogSort, str] = {
+    "title": "lower(t.title), t.id",
+    "bpm": "f.bpm NULLS LAST, lower(t.title), t.id",
+    "key": "f.camelot_num NULLS LAST, f.camelot_letter, f.bpm, lower(t.title), t.id",
+}
+
+
+def _like_pattern(text: str) -> str:
+    """Motif ILIKE « contient ce texte » : les % et _ tapés par l'utilisateur sont pris littéralement."""
+    escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
 
 
 class TrackRepository:
@@ -59,6 +144,30 @@ class TrackRepository:
             "SELECT id FROM track WHERE analysis_status = 'pending' ORDER BY created_at, id"
         )
         return [r["id"] for r in rows]
+
+    async def catalog(self, user_id: UUID, filters: CatalogFilters) -> CatalogPage:
+        """Page du catalogue vue par cet utilisateur (ses corrections passent avant Essentia)."""
+        params = {
+            "user_id": user_id,
+            "only_mine": filters.only_mine,
+            "text": _like_pattern(filters.text) if filters.text else None,
+            "bpm_min": filters.bpm_min,
+            "bpm_max": filters.bpm_max,
+            "key_num": filters.key.number if filters.key else None,
+            "key_letter": filters.key.letter if filters.key else None,
+            "status": filters.status,
+            "limit": filters.limit,
+            "offset": filters.offset,
+        }
+        # Deux requêtes : le total reste juste même quand la page demandée est vide.
+        total = await self._db.fetch_one(f"SELECT count(*) AS n {_CATALOG_FROM}", params)
+        rows = await self._db.fetch_all(
+            f"{_CATALOG_SELECT} {_CATALOG_FROM} ORDER BY {_CATALOG_ORDER[filters.sort]}"
+            " LIMIT %(limit)s OFFSET %(offset)s",
+            params,
+        )
+        assert total is not None
+        return CatalogPage(total=total["n"], items=[CatalogRow(**r) for r in rows])
 
     async def suggestions(
         self, seed: UUID, user_id: UUID | None, bpm_tolerance: float, limit: int

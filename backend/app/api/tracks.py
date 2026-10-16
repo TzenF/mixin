@@ -1,20 +1,79 @@
-"""Routes des morceaux : suggestions et demande d'analyse (réservées aux utilisateurs connectés)."""
+"""Routes des morceaux : catalogue, suggestions, demande d'analyse (utilisateurs connectés seulement)."""
 
 from dataclasses import asdict
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
 from app.adapters.queue import TaskQueue
-from app.adapters.track_repository import TrackRepository
+from app.adapters.track_repository import CatalogFilters, CatalogSort, TrackRepository
 from app.api.deps import get_current_user_id, get_queue, get_track_repository
+from app.domain.camelot import CamelotKey
 
 router = APIRouter(prefix="/tracks", tags=["tracks"])
 
 Tracks = Annotated[TrackRepository, Depends(get_track_repository)]
 CurrentUser = Annotated[UUID, Depends(get_current_user_id)]
+AnalysisStatus = Literal["pending", "done", "no_preview", "failed"]
+
+
+class CatalogTrack(BaseModel):
+    """Un morceau du catalogue ; bpm et camelot sont None tant qu'aucune source n'en donne."""
+
+    id: UUID
+    title: str
+    artists: list[str]
+    bpm: float | None
+    camelot: str | None
+    bpm_source: str | None
+    key_source: str | None
+    key_confidence: float | None
+    analysis_status: AnalysisStatus
+
+
+class Catalog(BaseModel):
+    """Une page du catalogue ; total = nombre de morceaux qui passent les filtres."""
+
+    total: int
+    items: list[CatalogTrack]
+
+
+@router.get("")
+async def catalog(
+    tracks: Tracks,
+    user_id: CurrentUser,
+    scope: Literal["mine", "all"] = "mine",
+    q: Annotated[str | None, Query(max_length=100)] = None,
+    bpm_min: Annotated[float | None, Query(ge=0, le=300)] = None,
+    bpm_max: Annotated[float | None, Query(ge=0, le=300)] = None,
+    key: Annotated[str | None, Query(max_length=10, description="Ex. 8A, 11B, Am, F#m")] = None,
+    analysis_status: Annotated[AnalysisStatus | None, Query(alias="status")] = None,
+    sort: CatalogSort = "title",
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> Catalog:
+    """Liste les morceaux (les miens, ou tous avec scope=all), filtrés et triés, page par page."""
+    try:
+        camelot = CamelotKey.parse(key) if key else None
+    except ValueError as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from e
+    page = await tracks.catalog(
+        user_id,
+        CatalogFilters(
+            only_mine=scope == "mine",
+            text=(q or "").strip() or None,
+            bpm_min=bpm_min,
+            bpm_max=bpm_max,
+            key=camelot,
+            status=analysis_status,
+            sort=sort,
+            limit=limit,
+            offset=offset,
+        ),
+    )
+    return Catalog(total=page.total, items=[CatalogTrack(**asdict(r)) for r in page.items])
 
 
 class Suggestion(BaseModel):
