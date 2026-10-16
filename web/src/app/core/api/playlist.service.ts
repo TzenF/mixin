@@ -42,6 +42,12 @@ export interface PlaylistDetail extends PlaylistSummary {
   items: PlaylistItem[];
 }
 
+/** Élément ajouté à une playlist. */
+export interface AddedItem {
+  item_id: number;
+  position: number;
+}
+
 /** Playlists de l'utilisateur connecté. */
 @Injectable({ providedIn: 'root' })
 export class PlaylistService {
@@ -55,5 +61,37 @@ export class PlaylistService {
   /** Une de mes playlists avec ses morceaux et leurs enchaînements ; 404 si elle n'est pas à moi. */
   get(playlistId: string): Observable<PlaylistDetail> {
     return this.http.get<PlaylistDetail>(`/api/playlists/${encodeURIComponent(playlistId)}`);
+  }
+
+  /** Crée une playlist vide. */
+  create(name: string): Observable<PlaylistSummary> {
+    return this.http.post<PlaylistSummary>('/api/playlists', { name });
+  }
+
+  /** Renomme une de mes playlists ; 409 si elle est importée. */
+  rename(playlistId: string, name: string): Observable<PlaylistSummary> {
+    return this.http.patch<PlaylistSummary>(`/api/playlists/${encodeURIComponent(playlistId)}`, {
+      name,
+    });
+  }
+
+  /** Supprime une de mes playlists (les morceaux restent dans le catalogue). */
+  delete(playlistId: string): Observable<void> {
+    return this.http.delete<void>(`/api/playlists/${encodeURIComponent(playlistId)}`);
+  }
+
+  /** Ajoute un morceau en fin de playlist ; 409 si elle est importée. */
+  addTrack(playlistId: string, trackId: string): Observable<AddedItem> {
+    return this.http.post<AddedItem>(`/api/playlists/${encodeURIComponent(playlistId)}/items`, {
+      track_id: trackId,
+    });
+  }
+
+  /** Duplique une de mes playlists (même importée) en une playlist modifiable « X (copie) ». */
+  copy(playlistId: string): Observable<PlaylistSummary> {
+    return this.http.post<PlaylistSummary>(
+      `/api/playlists/${encodeURIComponent(playlistId)}/copy`,
+      null,
+    );
   }
 }

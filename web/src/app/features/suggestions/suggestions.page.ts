@@ -12,6 +12,8 @@ import {
   Suggestion,
   SuggestionOptions,
 } from '../../core/api/catalog.service';
+import { AddToPlaylistComponent } from '../../shared/add-to-playlist/add-to-playlist.component';
+import { CurrentPlaylistBarComponent } from '../../shared/current-playlist-bar/current-playlist-bar.component';
 import { KEY_MOVE_LABELS } from '../../shared/key-moves';
 
 /** Écarts de BPM proposés (fractions) ; 0.06 = ±6 %, la valeur par défaut de l'API. */
@@ -28,7 +30,7 @@ type State =
 /** Page « Suggestions » : les morceaux qui s'enchaînent bien après un morceau ; un clic enchaîne. */
 @Component({
   selector: 'app-suggestions-page',
-  imports: [DecimalPipe],
+  imports: [DecimalPipe, AddToPlaylistComponent, CurrentPlaylistBarComponent],
   templateUrl: './suggestions.page.html',
   styleUrl: './suggestions.page.scss',
 })

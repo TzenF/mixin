@@ -1,0 +1,13 @@
+@use 'mixins' as m;
+
+:host {
+  white-space: nowrap;
+}
+
+button {
+  @include m.icon-button;
+}
+
+.error {
+  @include m.text-danger;
+}

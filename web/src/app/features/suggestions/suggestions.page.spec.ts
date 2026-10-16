@@ -5,6 +5,8 @@ import { ActivatedRoute, ParamMap, Router, convertToParamMap } from '@angular/ro
 import { BehaviorSubject } from 'rxjs';
 import { CatalogTrack, Suggestion } from '../../core/api/catalog.service';
 import { SuggestionsPage } from './suggestions.page';
+import { CurrentPlaylistService } from '../../core/current-playlist.service';
+import { FakeCurrentPlaylistService } from '../../core/current-playlist.service.fake';
 
 const SEED: CatalogTrack = {
   id: 'seed',
@@ -50,6 +52,7 @@ describe('SuggestionsPage', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
+        { provide: CurrentPlaylistService, useValue: new FakeCurrentPlaylistService() },
         { provide: Router, useValue: { navigate } },
         {
           provide: ActivatedRoute,
@@ -170,6 +173,19 @@ describe('SuggestionsPage', () => {
     await answer(notAnalysed, { ...SEED, bpm: null, camelot: null }, []);
     expect(byTestId(notAnalysed, 'not-analysed')).not.toBeNull();
     expect(byTestId<HTMLButtonElement>(notAnalysed, 'flip-mode')?.disabled).toBe(true);
+  });
+
+  it('propose « + Ajouter » pour le morceau de départ et chaque suggestion', async () => {
+    setup();
+    const fixture = create();
+    await answer(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    expect(root.querySelector('app-current-playlist-bar')).not.toBeNull();
+    expect(
+      root.querySelectorAll('[data-testid="seed"] [data-testid="add-to-playlist"]').length,
+    ).toBe(1);
+    expect(root.querySelectorAll('.suggestion-row [data-testid="add-to-playlist"]').length).toBe(2);
   });
 
   it('signale quand aucun morceau n’est compatible', async () => {

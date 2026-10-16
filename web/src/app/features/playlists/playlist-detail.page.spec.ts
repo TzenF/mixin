@@ -5,6 +5,8 @@ import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { CatalogTrack } from '../../core/api/catalog.service';
 import { PlaylistDetail, Transition } from '../../core/api/playlist.service';
 import { PlaylistDetailPage, describeTransition } from './playlist-detail.page';
+import { CurrentPlaylistService } from '../../core/current-playlist.service';
+import { FakeCurrentPlaylistService } from '../../core/current-playlist.service.fake';
 
 const TRACK: CatalogTrack = {
   id: 't1',
@@ -106,6 +108,7 @@ describe('PlaylistDetailPage', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
+        { provide: CurrentPlaylistService, useValue: new FakeCurrentPlaylistService() },
         { provide: Router, useValue: { navigate } },
         {
           provide: ActivatedRoute,
@@ -169,5 +172,50 @@ describe('PlaylistDetailPage', () => {
       req.flush({ detail: 'Playlist inconnue' }, { status: 404, statusText: '' }),
     );
     expect(all(fixture, 'not-found').length).toBe(1);
+  });
+
+  it('renomme une playlist créée ici', async () => {
+    const fixture = await render((req) => req.flush(PLAYLIST));
+    all(fixture, 'rename')[0].click();
+    fixture.detectChanges();
+
+    const input = all(fixture, 'rename-input')[0] as HTMLInputElement;
+    input.value = 'Set du dimanche';
+    all(fixture, 'rename-save')[0].click();
+    const req = http.expectOne('/api/playlists/set');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ name: 'Set du dimanche' });
+    req.flush({ ...PLAYLIST, name: 'Set du dimanche' });
+    await fixture.whenStable();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('h1')?.textContent).toBe(
+      'Set du dimanche',
+    );
+  });
+
+  it('une importée ne se renomme pas mais se duplique pour être modifiée', async () => {
+    const fixture = await render((req) => req.flush({ ...PLAYLIST, source_provider: 'spotify' }));
+    expect(all(fixture, 'rename').length).toBe(0);
+    expect(all(fixture, 'make-current').length).toBe(0);
+
+    const duplicate = all(fixture, 'duplicate')[0];
+    expect(duplicate.textContent).toContain('Dupliquer pour modifier');
+    duplicate.click();
+    http
+      .expectOne('/api/playlists/set/copy')
+      .flush({ ...PLAYLIST, id: 'copy', source_provider: null });
+
+    expect(navigate).toHaveBeenCalledWith(['/playlists', 'copy']);
+  });
+
+  it('supprime après confirmation puis revient à la liste', async () => {
+    const fixture = await render((req) => req.flush(PLAYLIST));
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    all(fixture, 'delete')[0].click();
+    http.expectOne('/api/playlists/set').flush(null, { status: 204, statusText: '' });
+
+    expect(navigate).toHaveBeenCalledWith(['/playlists']);
+    confirm.mockRestore();
   });
 });

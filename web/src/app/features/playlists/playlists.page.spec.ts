@@ -4,6 +4,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { PlaylistSummary } from '../../core/api/playlist.service';
 import { PlaylistsPage } from './playlists.page';
+import { CurrentPlaylistService } from '../../core/current-playlist.service';
+import { FakeCurrentPlaylistService } from '../../core/current-playlist.service.fake';
 
 const SET: PlaylistSummary = {
   id: 'set',
@@ -31,6 +33,7 @@ describe('PlaylistsPage', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
+        { provide: CurrentPlaylistService, useValue: new FakeCurrentPlaylistService() },
         { provide: Router, useValue: { navigate } },
       ],
     });
@@ -85,5 +88,52 @@ describe('PlaylistsPage', () => {
       req.flush({ detail: 'Non connecté' }, { status: 401, statusText: '' }),
     );
     expect(all(disconnected, 'connect-spotify').length).toBe(1);
+  });
+
+  it('crée une playlist, qui devient la playlist en cours', async () => {
+    const fixture = await render((req) => req.flush([]));
+    const root = fixture.nativeElement as HTMLElement;
+
+    root.querySelector<HTMLInputElement>('[data-testid="new-playlist-name"]')!.value = 'Samedi';
+    root.querySelector<HTMLButtonElement>('[data-testid="create-playlist"]')!.click();
+    http.expectOne('/api/playlists').flush([]); // la liste est rechargée
+
+    const current = TestBed.inject(CurrentPlaylistService) as unknown as FakeCurrentPlaylistService;
+    expect(current.current()?.name).toBe('Samedi');
+  });
+
+  it('choisit la playlist en cours (pas une importée)', async () => {
+    const fixture = await render((req) => req.flush([{ ...SET, id: 'current' }, MIXY]));
+    const rows = all(fixture, 'playlist-row');
+    expect(rows[1].querySelector('[data-testid="make-current"]')).toBeNull();
+
+    rows[0].querySelector<HTMLButtonElement>('[data-testid="make-current"]')!.click();
+    fixture.detectChanges();
+
+    expect(all(fixture, 'is-current').length).toBe(1);
+  });
+
+  it('duplique une playlist', async () => {
+    const fixture = await render((req) => req.flush([MIXY]));
+    all(fixture, 'duplicate')[0].click();
+
+    expect(http.expectOne('/api/playlists/mixy/copy').request.method).toBe('POST');
+  });
+
+  it('supprime après confirmation seulement', async () => {
+    const fixture = await render((req) => req.flush([SET]));
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    all(fixture, 'delete')[0].click();
+    http.expectNone('/api/playlists/set');
+
+    confirm.mockReturnValue(true);
+    all(fixture, 'delete')[0].click();
+    const req = http.expectOne('/api/playlists/set');
+    expect(req.request.method).toBe('DELETE');
+    req.flush(null, { status: 204, statusText: '' });
+    http.expectOne('/api/playlists').flush([]);
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Set du samedi'));
+    confirm.mockRestore();
   });
 });

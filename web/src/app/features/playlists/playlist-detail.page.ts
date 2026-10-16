@@ -6,6 +6,7 @@ import { apiErrorMessage } from '../../core/api/api-error';
 import { SPOTIFY_LOGIN_URL } from '../../core/api/auth.service';
 import { CatalogTrack } from '../../core/api/catalog.service';
 import { PlaylistDetail, PlaylistService, Transition } from '../../core/api/playlist.service';
+import { CurrentPlaylistService } from '../../core/current-playlist.service';
 import { KEY_MOVE_LABELS, formatBpmChange } from '../../shared/key-moves';
 
 type State =
@@ -31,10 +32,15 @@ export interface TransitionView {
 export class PlaylistDetailPage {
   private readonly service = inject(PlaylistService);
   private readonly router = inject(Router);
+  protected readonly currentPlaylist = inject(CurrentPlaylistService);
   private readonly playlistId = inject(ActivatedRoute).snapshot.paramMap.get('playlistId') ?? '';
 
   protected readonly loginUrl = SPOTIFY_LOGIN_URL;
   protected readonly state = signal<State>({ kind: 'loading' });
+  /** Vrai pendant la modification du nom. */
+  protected readonly renaming = signal(false);
+  /** Échec de la dernière action (renommer, dupliquer, supprimer), ou null. */
+  protected readonly actionError = signal<string | null>(null);
 
   /** Playlist affichée, ou null tant qu'elle n'est pas chargée. */
   protected readonly playlist = computed(() => {
@@ -68,6 +74,7 @@ export class PlaylistDetailPage {
 
   constructor() {
     this.load();
+    this.currentPlaylist.refresh();
   }
 
   /** Charge la playlist ; 401 = pas connectée, 404 = pas à moi ou inexistante. */
@@ -95,9 +102,66 @@ export class PlaylistDetailPage {
     void this.router.navigate(['/suggestions', track.id], { queryParams: { scope: 'all' } });
   }
 
+  /** Renomme la playlist (playlists créées ici seulement). */
+  protected rename(nameInput: HTMLInputElement): void {
+    const name = nameInput.value.trim();
+    if (name === '') {
+      return;
+    }
+    this.service.rename(this.playlistId, name).subscribe({
+      next: (renamed) => {
+        this.renaming.set(false);
+        this.state.update((s) =>
+          s.kind === 'ready' ? { ...s, playlist: { ...s.playlist, name: renamed.name } } : s,
+        );
+        this.currentPlaylist.refresh();
+      },
+      error: (err: HttpErrorResponse) => this.fail(err, 'Impossible de renommer la playlist.'),
+    });
+  }
+
+  /** Fait de cette playlist la playlist en cours. */
+  protected makeCurrent(): void {
+    this.currentPlaylist.select(this.playlistId);
+  }
+
+  /** Duplique la playlist et ouvre la copie (une importée devient ainsi modifiable). */
+  protected duplicate(): void {
+    this.service.copy(this.playlistId).subscribe({
+      next: (copy) => {
+        this.currentPlaylist.refresh();
+        void this.router.navigate(['/playlists', copy.id]);
+      },
+      error: (err: HttpErrorResponse) => this.fail(err, 'Impossible de dupliquer la playlist.'),
+    });
+  }
+
+  /** Supprime la playlist après confirmation, puis revient à la liste. */
+  protected remove(playlist: PlaylistDetail): void {
+    if (!confirm(`Supprimer « ${playlist.name} » ? Les morceaux restent dans le catalogue.`)) {
+      return;
+    }
+    this.service.delete(this.playlistId).subscribe({
+      next: () => {
+        this.currentPlaylist.refresh();
+        this.backToList();
+      },
+      error: (err: HttpErrorResponse) => this.fail(err, 'Impossible de supprimer la playlist.'),
+    });
+  }
+
   /** Revient à la liste des playlists. */
   protected backToList(): void {
     void this.router.navigate(['/playlists']);
+  }
+
+  /** Affiche l'échec d'une action ; 401 = pas connectée. */
+  private fail(err: HttpErrorResponse, fallback: string): void {
+    if (err.status === 401) {
+      this.state.set({ kind: 'disconnected' });
+    } else {
+      this.actionError.set(apiErrorMessage(err, fallback));
+    }
   }
 }
 

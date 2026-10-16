@@ -13,6 +13,8 @@ import {
   CatalogSort,
   CatalogTrack,
 } from '../../core/api/catalog.service';
+import { AddToPlaylistComponent } from '../../shared/add-to-playlist/add-to-playlist.component';
+import { CurrentPlaylistBarComponent } from '../../shared/current-playlist-bar/current-playlist-bar.component';
 
 const PAGE_SIZE = 50;
 /** Délai entre la dernière frappe dans la recherche et l'appel à l'API. */
@@ -36,7 +38,7 @@ type State =
 /** Page « Catalogue » : mes morceaux (ou tous), filtrés et triés, avec BPM et tonalité. */
 @Component({
   selector: 'app-catalog-page',
-  imports: [DecimalPipe],
+  imports: [DecimalPipe, AddToPlaylistComponent, CurrentPlaylistBarComponent],
   templateUrl: './catalog.page.html',
   styleUrl: './catalog.page.scss',
 })

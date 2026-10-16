@@ -1,0 +1,13 @@
+<button
+  type="button"
+  [disabled]="!enabled()"
+  [title]="hint()"
+  [attr.aria-label]="hint()"
+  (click)="add()"
+  data-testid="add-to-playlist"
+>
+  {{ added() ? '✓ Ajouté' : adding() ? 'Ajout…' : '+ Ajouter' }}
+</button>
+@if (error(); as message) {
+  <span class="error" data-testid="add-error">{{ message }}</span>
+}

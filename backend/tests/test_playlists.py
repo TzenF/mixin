@@ -1,5 +1,6 @@
-"""Playlists (lecture) contre la vraie base : liste, détail, enchaînements, accès réservé au propriétaire."""
+"""Playlists contre la vraie base : lecture, enchaînements, modification, accès réservé au propriétaire."""
 
+import asyncio
 import uuid
 from collections.abc import Iterator
 from typing import Any
@@ -8,7 +9,9 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
+from app.adapters.db import Database
 from app.config import get_settings
+from app.services.playlist_editor import PlaylistEditor
 from tests.conftest import requires_services
 
 pytestmark = requires_services
@@ -138,3 +141,108 @@ def test_someone_elses_playlist_is_not_found(logged_in_client: TestClient, playl
 def test_playlists_require_a_session(client: TestClient) -> None:
     assert client.get("/playlists").status_code == 401
     assert client.get(f"/playlists/{uuid.uuid4()}").status_code == 401
+
+
+def _detail(client: TestClient, playlist_id: str) -> dict[str, Any]:
+    """Détail d'une playlist (doit exister)."""
+    resp = client.get(f"/playlists/{playlist_id}")
+    assert resp.status_code == 200, resp.text
+    return resp.json()
+
+
+def _track_id(prefix: str, title: str) -> str:
+    """Identifiant d'un morceau de test."""
+    with psycopg.connect(get_settings().database_url) as conn:
+        row = conn.execute("SELECT id FROM track WHERE title = %s", (f"{prefix} {title}",)).fetchone()
+    assert row is not None
+    return str(row[0])
+
+
+def test_create_and_rename(logged_in_client: TestClient, test_prefix: str, user_id: uuid.UUID) -> None:
+    created = logged_in_client.post("/playlists", json={"name": f"  {test_prefix} Nouveau  "})
+    assert created.status_code == 201
+    playlist = created.json()
+    assert (playlist["name"], playlist["track_count"], playlist["source_provider"]) == (
+        f"{test_prefix} Nouveau",
+        0,
+        None,
+    )
+
+    renamed = logged_in_client.patch(f"/playlists/{playlist['id']}", json={"name": f"{test_prefix} Samedi"})
+    assert renamed.status_code == 200 and renamed.json()["name"] == f"{test_prefix} Samedi"
+    assert logged_in_client.post("/playlists", json={"name": "   "}).status_code == 422
+
+
+def test_add_tracks_at_the_end(
+    logged_in_client: TestClient, playlists: dict[str, str], test_prefix: str
+) -> None:
+    a = _track_id(test_prefix, "A")
+    added = logged_in_client.post(f"/playlists/{playlists['mine']}/items", json={"track_id": a})
+
+    assert added.status_code == 201 and added.json()["position"] == 5
+    items = _detail(logged_in_client, playlists["mine"])["items"]
+    assert [i["track"]["title"].removeprefix(f"{test_prefix} ") for i in items][
+        -1
+    ] == "A"  # en double : permis
+    unknown = logged_in_client.post(
+        f"/playlists/{playlists['mine']}/items", json={"track_id": str(uuid.uuid4())}
+    )
+    assert unknown.status_code == 404
+
+
+def test_imported_playlists_are_read_only(
+    logged_in_client: TestClient, playlists: dict[str, str], test_prefix: str
+) -> None:
+    imported = playlists["imported"]
+    a = _track_id(test_prefix, "A")
+
+    assert logged_in_client.post(f"/playlists/{imported}/items", json={"track_id": a}).status_code == 409
+    assert logged_in_client.patch(f"/playlists/{imported}", json={"name": "x"}).status_code == 409
+
+    copy = logged_in_client.post(f"/playlists/{imported}/copy")
+    assert copy.status_code == 201
+    assert (copy.json()["name"], copy.json()["source_provider"]) == (f"{test_prefix} Importée (copie)", None)
+    assert len(_detail(logged_in_client, copy.json()["id"])["items"]) == 1
+    assert (
+        logged_in_client.post(f"/playlists/{copy.json()['id']}/items", json={"track_id": a}).status_code
+        == 201
+    )
+
+
+def test_delete(logged_in_client: TestClient, playlists: dict[str, str]) -> None:
+    for name in ("mine", "imported"):  # une importée peut être supprimée (puis réimportée)
+        assert logged_in_client.delete(f"/playlists/{playlists[name]}").status_code == 204
+        assert logged_in_client.get(f"/playlists/{playlists[name]}").status_code == 404
+
+
+def test_cannot_touch_someone_elses_playlist(
+    logged_in_client: TestClient, playlists: dict[str, str], test_prefix: str
+) -> None:
+    other = playlists["other"]
+    a = _track_id(test_prefix, "A")
+    assert logged_in_client.post(f"/playlists/{other}/items", json={"track_id": a}).status_code == 404
+    assert logged_in_client.patch(f"/playlists/{other}", json={"name": "x"}).status_code == 404
+    assert logged_in_client.post(f"/playlists/{other}/copy").status_code == 404
+    assert logged_in_client.delete(f"/playlists/{other}").status_code == 404
+
+
+def test_writes_require_a_session(client: TestClient) -> None:
+    some_id = uuid.uuid4()
+    assert client.post("/playlists", json={"name": "x"}).status_code == 401
+    assert client.patch(f"/playlists/{some_id}", json={"name": "x"}).status_code == 401
+    assert client.delete(f"/playlists/{some_id}").status_code == 401
+    assert client.post(f"/playlists/{some_id}/items", json={"track_id": str(some_id)}).status_code == 401
+    assert client.post(f"/playlists/{some_id}/copy").status_code == 401
+
+
+@pytest.mark.anyio
+async def test_simultaneous_adds_get_distinct_positions(
+    db: Database, playlists: dict[str, str], test_prefix: str, user_id: uuid.UUID
+) -> None:
+    editor = PlaylistEditor(db)
+    a = uuid.UUID(_track_id(test_prefix, "A"))
+    added = await asyncio.gather(
+        *(editor.add_track(user_id, uuid.UUID(playlists["mine"]), a) for _ in range(5))
+    )
+
+    assert sorted(position for _, position in added) == [5, 6, 7, 8, 9]

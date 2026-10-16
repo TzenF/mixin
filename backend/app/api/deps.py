@@ -15,6 +15,7 @@ from app.adapters.spotify_provider import SpotifyProvider
 from app.adapters.token_cipher import TokenCipher
 from app.adapters.track_repository import TrackRepository
 from app.config import Settings
+from app.services.playlist_editor import PlaylistEditor
 from app.services.playlist_import import PlaylistImporter
 from app.services.sessions import SessionService
 from app.services.spotify_connection import SpotifyConnection
@@ -100,3 +101,8 @@ def get_playlist_importer(
 ) -> PlaylistImporter:
     """Fournit le service d'import de playlists Spotify."""
     return PlaylistImporter(db, provider, queue)
+
+
+def get_playlist_editor(db: Annotated[Database, Depends(get_db)]) -> PlaylistEditor:
+    """Fournit le service de modification des playlists."""
+    return PlaylistEditor(db)

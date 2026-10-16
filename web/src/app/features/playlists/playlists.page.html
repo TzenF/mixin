@@ -1,6 +1,18 @@
 <main>
   <h1>Playlists</h1>
 
+  <form class="create" (submit)="$event.preventDefault(); create(name)">
+    <label>
+      Nouvelle playlist
+      <input #name type="text" maxlength="100" placeholder="Nom" data-testid="new-playlist-name" />
+    </label>
+    <button type="submit" data-testid="create-playlist">Créer</button>
+  </form>
+
+  @if (actionError(); as message) {
+    <p class="error" data-testid="action-error">{{ message }}</p>
+  }
+
   @switch (state().kind) {
     @case ('loading') {
       <p class="hint" data-testid="loading">Chargement…</p>
@@ -18,12 +30,13 @@
   @if (playlists(); as playlists) {
     @if (playlists.length === 0) {
       <p class="hint" data-testid="empty">
-        Aucune playlist pour l'instant : importe-en une depuis « Mes playlists Spotify ».
+        Aucune playlist pour l'instant : crée-en une, ou importe-en depuis « Mes playlists Spotify
+        ».
       </p>
     } @else {
       <ul data-testid="playlists">
         @for (playlist of playlists; track playlist.id) {
-          <li>
+          <li class="row" data-testid="playlist-row">
             <button type="button" class="playlist" (click)="open(playlist)" data-testid="playlist">
               <span class="name">{{ playlist.name }}</span>
               <span class="meta">
@@ -31,8 +44,41 @@
                 @if (playlist.source_provider === 'spotify') {
                   <span class="badge" data-testid="imported">Spotify</span>
                 }
+                @if (currentPlaylist.current()?.id === playlist.id) {
+                  <span class="badge" data-testid="is-current">En cours</span>
+                }
               </span>
             </button>
+            <span class="actions">
+              @if (
+                playlist.source_provider === null && currentPlaylist.current()?.id !== playlist.id
+              ) {
+                <button
+                  type="button"
+                  class="secondary"
+                  (click)="makeCurrent(playlist)"
+                  data-testid="make-current"
+                >
+                  En cours
+                </button>
+              }
+              <button
+                type="button"
+                class="secondary"
+                (click)="duplicate(playlist)"
+                data-testid="duplicate"
+              >
+                Dupliquer
+              </button>
+              <button
+                type="button"
+                class="secondary"
+                (click)="remove(playlist)"
+                data-testid="delete"
+              >
+                Supprimer
+              </button>
+            </span>
           </li>
         }
       </ul>

@@ -39,6 +39,12 @@ li {
   margin-bottom: t.$space-2;
 }
 
+.suggestion-row {
+  display: flex;
+  align-items: center;
+  gap: t.$space-2;
+}
+
 button.suggestion {
   @include m.card-button;
   display: flex;

@@ -1,5 +1,6 @@
 <main>
   <h1>Catalogue</h1>
+  <app-current-playlist-bar />
 
   <form class="filters" (submit)="$event.preventDefault()" data-testid="filters">
     <label class="toggle">
@@ -153,6 +154,7 @@
                 >
                   Suggestions
                 </button>
+                <app-add-to-playlist [trackId]="track.id" />
               </td>
             </tr>
           }

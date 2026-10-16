@@ -23,7 +23,53 @@
   }
 
   @if (playlist(); as playlist) {
-    <h1>{{ playlist.name }}</h1>
+    @if (renaming()) {
+      <form class="rename" (submit)="$event.preventDefault(); rename(name)">
+        <input
+          #name
+          type="text"
+          maxlength="100"
+          [value]="playlist.name"
+          aria-label="Nom de la playlist"
+          data-testid="rename-input"
+        />
+        <button type="submit" data-testid="rename-save">Enregistrer</button>
+        <button type="button" class="secondary" (click)="renaming.set(false)">Annuler</button>
+      </form>
+    } @else {
+      <h1>{{ playlist.name }}</h1>
+    }
+
+    <p class="actions">
+      @if (playlist.source_provider === null) {
+        @if (!renaming()) {
+          <button type="button" class="secondary" (click)="renaming.set(true)" data-testid="rename">
+            Renommer
+          </button>
+        }
+        @if (currentPlaylist.current()?.id === playlist.id) {
+          <span class="badge" data-testid="is-current">Playlist en cours</span>
+        } @else {
+          <button
+            type="button"
+            class="secondary"
+            (click)="makeCurrent()"
+            data-testid="make-current"
+          >
+            En cours
+          </button>
+        }
+      }
+      <button type="button" class="secondary" (click)="duplicate()" data-testid="duplicate">
+        {{ playlist.source_provider === null ? 'Dupliquer' : 'Dupliquer pour modifier' }}
+      </button>
+      <button type="button" class="secondary" (click)="remove(playlist)" data-testid="delete">
+        Supprimer
+      </button>
+    </p>
+    @if (actionError(); as message) {
+      <p class="error" data-testid="action-error">{{ message }}</p>
+    }
     <p class="hint" data-testid="summary">
       {{ playlist.items.length }} titre{{ playlist.items.length > 1 ? 's' : '' }} ·
       {{ counts().warn }} enchaînement{{ counts().warn > 1 ? 's' : '' }} ⚠

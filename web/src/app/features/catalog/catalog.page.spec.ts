@@ -8,6 +8,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { CatalogPage as Page, CatalogTrack } from '../../core/api/catalog.service';
 import { CatalogPage, SEARCH_DELAY_MS } from './catalog.page';
+import { CurrentPlaylistService } from '../../core/current-playlist.service';
+import { FakeCurrentPlaylistService } from '../../core/current-playlist.service.fake';
 
 const ALPHA: CatalogTrack = {
   id: 'a',
@@ -41,6 +43,7 @@ describe('CatalogPage', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
+        { provide: CurrentPlaylistService, useValue: new FakeCurrentPlaylistService() },
         { provide: Router, useValue: { navigate } },
         {
           provide: ActivatedRoute,
@@ -207,6 +210,17 @@ describe('CatalogPage', () => {
     });
   });
 
+  it('propose la barre de playlist en cours et « + Ajouter » sur chaque ligne', async () => {
+    setup();
+    const fixture = await render();
+    const root = fixture.nativeElement as HTMLElement;
+
+    expect(root.querySelector('app-current-playlist-bar')).not.toBeNull();
+    expect(
+      root.querySelectorAll('[data-testid="track-row"] [data-testid="add-to-playlist"]').length,
+    ).toBe(2);
+  });
+
   it('signale quand aucun morceau ne correspond', async () => {
     setup();
     const fixture = await render({ total: 0, items: [] });
@@ -267,6 +281,7 @@ describe('CatalogPage — inversion majeur/mineur', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
+        { provide: CurrentPlaylistService, useValue: new FakeCurrentPlaylistService() },
         { provide: Router, useValue: { navigate: vi.fn().mockResolvedValue(true) } },
         {
           provide: ActivatedRoute,

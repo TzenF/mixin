@@ -2,7 +2,11 @@
 @use 'tokens' as t;
 
 main {
-  @include m.page(t.$width-narrow);
+  @include m.page(t.$width-page);
+}
+
+.create {
+  @include m.filter-bar;
 }
 
 .hint,
@@ -18,13 +22,17 @@ ul {
   @include m.reset-list;
 }
 
-li {
+.row {
+  display: flex;
+  align-items: center;
+  gap: t.$space-2;
   margin-bottom: t.$space-2;
 }
 
 button.playlist {
   @include m.card-button;
   display: flex;
+  flex: 1;
   justify-content: space-between;
   align-items: center;
 }
@@ -37,13 +45,23 @@ button.playlist {
   font-size: t.$font-size-sm;
 }
 
+.actions {
+  display: flex;
+  gap: t.$space-1;
+  white-space: nowrap;
+}
+
 .badge {
   @include m.badge;
   @include m.status(success);
   margin-left: t.$space-2;
 }
 
-button:not(.playlist),
+button,
 .button {
   @include m.button-primary;
+}
+
+button.secondary {
+  @include m.button-secondary;
 }

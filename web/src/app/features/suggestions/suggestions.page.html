@@ -5,6 +5,7 @@
     </button>
   </p>
   <h1>Suggestions</h1>
+  <app-current-playlist-bar />
 
   <form class="options" (submit)="$event.preventDefault()">
     <label class="toggle">
@@ -70,6 +71,7 @@
         >
           ⇄
         </button>
+        <app-add-to-playlist [trackId]="seed.id" />
       </p>
     </section>
 
@@ -85,7 +87,7 @@
       } @else {
         <ol data-testid="suggestions">
           @for (s of suggestions; track s.track_id) {
-            <li>
+            <li class="suggestion-row">
               <button
                 type="button"
                 class="suggestion"
@@ -103,6 +105,7 @@
                   }
                 </span>
               </button>
+              <app-add-to-playlist [trackId]="s.track_id" />
             </li>
           }
         </ol>

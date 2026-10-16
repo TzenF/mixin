@@ -1,0 +1,34 @@
+<form class="bar" (submit)="$event.preventDefault()" data-testid="current-playlist-bar">
+  <label>
+    Playlist en cours
+    <select (change)="choose($event)" data-testid="current-playlist">
+      <option value="" [selected]="playlist.current() === null">— aucune —</option>
+      @for (p of playlist.editable() ?? []; track p.id) {
+        <option [value]="p.id" [selected]="playlist.current()?.id === p.id">
+          {{ p.name }} ({{ p.track_count }})
+        </option>
+      }
+    </select>
+  </label>
+
+  @if (creating()) {
+    <input
+      #name
+      type="text"
+      maxlength="100"
+      placeholder="Nom de la playlist"
+      (keydown.enter)="create(name)"
+      data-testid="new-playlist-name"
+    />
+    <button type="button" (click)="create(name)" data-testid="create-playlist">Créer</button>
+    <button type="button" class="secondary" (click)="creating.set(false)">Annuler</button>
+  } @else {
+    <button type="button" class="secondary" (click)="creating.set(true)" data-testid="new-playlist">
+      Nouvelle playlist
+    </button>
+  }
+
+  @if (error(); as message) {
+    <span class="error" data-testid="bar-error">{{ message }}</span>
+  }
+</form>

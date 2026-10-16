@@ -119,6 +119,51 @@ class PlaylistRepository:
         assert row is not None
         return row["id"]
 
+    async def create(self, owner_id: UUID, name: str, forked_from: UUID | None = None) -> UUID:
+        """Crée une playlist vide dans l'application (forked_from : playlist dont elle est la copie)."""
+        row = await self._db.fetch_one(
+            """INSERT INTO playlist (owner_id, name, forked_from_id)
+               VALUES (%(owner)s, %(name)s, %(forked_from)s) RETURNING id""",
+            {"owner": owner_id, "name": name, "forked_from": forked_from},
+        )
+        assert row is not None
+        return row["id"]
+
+    async def lock(self, playlist_id: UUID) -> None:
+        """Verrouille la playlist jusqu'à la fin de la transaction, pour ajouter sans conflit de position."""
+        await self._db.fetch_one("SELECT 1 FROM playlist WHERE id = %(id)s FOR UPDATE", {"id": playlist_id})
+
+    async def append_item(self, playlist_id: UUID, track_id: UUID) -> tuple[int, int]:
+        """Ajoute le morceau en fin de playlist ; renvoie (identifiant de l'élément, position)."""
+        row = await self._db.fetch_one(
+            """INSERT INTO playlist_item (playlist_id, track_id, position)
+               SELECT %(id)s, %(track_id)s,
+                      COALESCE((SELECT max(position) + 1 FROM playlist_item WHERE playlist_id = %(id)s), 0)
+               RETURNING id, position""",
+            {"id": playlist_id, "track_id": track_id},
+        )
+        assert row is not None
+        await self._touch(playlist_id)
+        return row["id"], row["position"]
+
+    async def copy_items(self, source_id: UUID, target_id: UUID) -> None:
+        """Recopie les morceaux de `source_id` dans `target_id`, dans le même ordre."""
+        await self._db.fetch_one(
+            """INSERT INTO playlist_item (playlist_id, track_id, position)
+               SELECT %(target)s, track_id, position FROM playlist_item WHERE playlist_id = %(source)s""",
+            {"source": source_id, "target": target_id},
+        )
+
+    async def delete(self, playlist_id: UUID) -> None:
+        """Supprime la playlist et ses éléments (les morceaux restent dans le catalogue)."""
+        await self._db.fetch_one("DELETE FROM playlist WHERE id = %(id)s", {"id": playlist_id})
+
+    async def _touch(self, playlist_id: UUID) -> None:
+        """Note que la playlist vient d'être modifiée."""
+        await self._db.fetch_one(
+            "UPDATE playlist SET updated_at = now() WHERE id = %(id)s", {"id": playlist_id}
+        )
+
     async def rename(self, playlist_id: UUID, name: str) -> None:
         """Change le nom de la playlist."""
         await self._db.fetch_one(
@@ -135,9 +180,7 @@ class PlaylistRepository:
                FROM unnest(%(track_ids)s::uuid[]) WITH ORDINALITY AS t(track_id, ord)""",
             {"id": playlist_id, "track_ids": track_ids},
         )
-        await self._db.fetch_one(
-            "UPDATE playlist SET updated_at = now() WHERE id = %(id)s", {"id": playlist_id}
-        )
+        await self._touch(playlist_id)
 
     async def track_ids(self, playlist_id: UUID) -> list[UUID]:
         """Morceaux de la playlist, dans l'ordre."""

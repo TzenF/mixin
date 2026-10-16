@@ -62,6 +62,17 @@ ol {
   }
 }
 
+.rename {
+  @include m.filter-bar;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: t.$space-2;
+}
+
 .badge {
   @include m.badge;
   @include m.status(success);
