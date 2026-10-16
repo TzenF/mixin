@@ -1,0 +1,27 @@
+@use 'mixins' as m;
+@use 'tokens' as t;
+
+main {
+  @include m.page(t.$width-narrow);
+}
+
+ul {
+  @include m.reset-list;
+}
+
+li {
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-1;
+  margin-bottom: t.$space-4;
+}
+
+.button {
+  @include m.button-primary;
+  align-self: flex-start;
+}
+
+.description {
+  @include m.text-muted;
+  font-size: t.$font-size-sm;
+}

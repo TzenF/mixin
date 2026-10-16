@@ -8,7 +8,7 @@ type State =
   | { kind: 'ready'; health: Health }
   | { kind: 'error'; message: string };
 
-/** Page d'accueil provisoire : affiche l'état de la base et de la file de tâches. */
+/** Page « État des services » : affiche l'état de la base et de la file de tâches. */
 @Component({
   selector: 'app-status-page',
   imports: [RouterLink],

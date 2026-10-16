@@ -1,6 +1,5 @@
 <main>
-  <h1>DJ Platform</h1>
-  <p class="subtitle">État des services</p>
+  <h1>État des services</h1>
 
   @if (health(); as health) {
     <ul data-testid="services">
@@ -19,5 +18,5 @@
 
   <button type="button" (click)="refresh()">Revérifier</button>
 
-  <p><a routerLink="/spotify" data-testid="spotify-link">Mes playlists Spotify</a></p>
+  <p><a routerLink="/" data-testid="home-link">Accueil</a></p>
 </main>

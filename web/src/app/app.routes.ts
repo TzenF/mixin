@@ -3,8 +3,13 @@ import { Routes } from '@angular/router';
 export const routes: Routes = [
   {
     path: '',
-    loadComponent: () => import('./features/status/status.page').then((m) => m.StatusPage),
+    loadComponent: () => import('./features/home/home.page').then((m) => m.HomePage),
     title: 'DJ Platform',
+  },
+  {
+    path: 'status',
+    loadComponent: () => import('./features/status/status.page').then((m) => m.StatusPage),
+    title: 'État des services · DJ Platform',
   },
   {
     path: 'spotify',

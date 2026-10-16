@@ -1,0 +1,19 @@
+<main>
+  <h1>DJ Platform</h1>
+  <nav>
+    <ul data-testid="home-links">
+      @for (link of links; track link.path) {
+        <li>
+          <a
+            class="button"
+            [routerLink]="link.path"
+            [attr.data-testid]="'link-' + link.path.slice(1)"
+          >
+            {{ link.label }}
+          </a>
+          <span class="description">{{ link.description }}</span>
+        </li>
+      }
+    </ul>
+  </nav>
+</main>
