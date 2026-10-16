@@ -12,5 +12,10 @@ export const routes: Routes = [
       import('./features/spotify/spotify-playlists.page').then((m) => m.SpotifyPlaylistsPage),
     title: 'Mes playlists Spotify · DJ Platform',
   },
+  {
+    path: 'catalog',
+    loadComponent: () => import('./features/catalog/catalog.page').then((m) => m.CatalogPage),
+    title: 'Catalogue · DJ Platform',
+  },
   { path: '**', redirectTo: '' },
 ];

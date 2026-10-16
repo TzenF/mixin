@@ -68,6 +68,14 @@
   }
 }
 
+/// Bouton secondaire : même forme que le principal, encadré et sans fond.
+@mixin button-secondary {
+  @include button-primary;
+  border: t.$border-width solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+}
+
 /// Texte secondaire, moins contrasté.
 @mixin text-muted {
   color: var(--color-text-muted);

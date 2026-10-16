@@ -1,0 +1,154 @@
+<main>
+  <h1>Catalogue</h1>
+
+  <form class="filters" (submit)="$event.preventDefault()" data-testid="filters">
+    <label class="toggle">
+      <input
+        type="checkbox"
+        [checked]="query().scope === 'all'"
+        (change)="setShowAll(checkedOf($event))"
+        data-testid="show-all"
+      />
+      Tous les morceaux
+    </label>
+
+    <label>
+      Recherche
+      <input
+        type="search"
+        placeholder="Titre ou artiste"
+        [value]="query().q"
+        (input)="search(valueOf($event))"
+        data-testid="search"
+      />
+    </label>
+
+    <label>
+      BPM min
+      <input
+        type="number"
+        min="0"
+        max="300"
+        [value]="query().bpmMin ?? ''"
+        (change)="setBpmMin(valueOf($event))"
+        data-testid="bpm-min"
+      />
+    </label>
+
+    <label>
+      BPM max
+      <input
+        type="number"
+        min="0"
+        max="300"
+        [value]="query().bpmMax ?? ''"
+        (change)="setBpmMax(valueOf($event))"
+        data-testid="bpm-max"
+      />
+    </label>
+
+    <label>
+      Tonalité
+      <input
+        type="text"
+        placeholder="8A, Am…"
+        size="5"
+        [value]="query().key"
+        (change)="setKey(valueOf($event))"
+        data-testid="key"
+      />
+    </label>
+
+    <label>
+      Statut
+      <select (change)="setStatus(valueOf($event))" data-testid="status">
+        <option value="" [selected]="query().status === ''">Tous</option>
+        @for (status of statuses; track status) {
+          <option [value]="status" [selected]="query().status === status">
+            {{ statusLabels[status] }}
+          </option>
+        }
+      </select>
+    </label>
+
+    <label>
+      Trier par
+      <select (change)="setSort(valueOf($event))" data-testid="sort">
+        <option value="title" [selected]="query().sort === 'title'">Titre</option>
+        <option value="bpm" [selected]="query().sort === 'bpm'">BPM</option>
+        <option value="key" [selected]="query().sort === 'key'">Tonalité</option>
+      </select>
+    </label>
+  </form>
+
+  @switch (state().kind) {
+    @case ('loading') {
+      <p class="hint" data-testid="loading">Chargement…</p>
+    }
+    @case ('disconnected') {
+      <p class="hint">Connecte-toi avec Spotify pour voir ton catalogue.</p>
+      <a class="button" [href]="loginUrl" data-testid="connect-spotify">Connecter Spotify</a>
+    }
+    @case ('error') {
+      <p class="error" data-testid="error">{{ errorMessage() }}</p>
+      <button type="button" (click)="load()">Réessayer</button>
+    }
+  }
+
+  @if (page(); as page) {
+    @if (range(); as r) {
+      <p class="hint" data-testid="range">{{ r.from }}–{{ r.to }} sur {{ r.total }}</p>
+      <table data-testid="tracks">
+        <thead>
+          <tr>
+            <th scope="col">Titre</th>
+            <th scope="col">Artistes</th>
+            <th scope="col" class="number">BPM</th>
+            <th scope="col">Tonalité</th>
+            <th scope="col">Analyse</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (track of page.items; track track.id) {
+            <tr data-testid="track-row">
+              <td>{{ track.title }}</td>
+              <td class="muted">{{ track.artists.join(', ') }}</td>
+              <td class="number" data-testid="bpm">
+                {{ track.bpm === null ? '—' : (track.bpm | number: '1.1-1') }}
+              </td>
+              <td data-testid="camelot">{{ track.camelot ?? '—' }}</td>
+              <td>
+                <span [class]="'badge ' + track.analysis_status" data-testid="status-badge">
+                  {{ statusLabels[track.analysis_status] }}
+                </span>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    } @else {
+      <p class="hint" data-testid="empty">Aucun morceau ne correspond à ces filtres.</p>
+    }
+
+    <nav class="pager">
+      <button
+        type="button"
+        class="secondary"
+        [disabled]="!hasPrevious()"
+        (click)="previous()"
+        data-testid="previous"
+      >
+        Précédent
+      </button>
+      <button
+        type="button"
+        class="secondary"
+        [disabled]="!hasNext()"
+        (click)="next()"
+        data-testid="next"
+      >
+        Suivant
+      </button>
+    </nav>
+  }
+</main>

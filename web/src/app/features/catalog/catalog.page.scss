@@ -1,0 +1,107 @@
+@use 'mixins' as m;
+@use 'tokens' as t;
+
+main {
+  @include m.page;
+}
+
+.hint,
+.muted {
+  @include m.text-muted;
+}
+
+.error {
+  @include m.text-danger;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: t.$space-3;
+  margin-bottom: t.$space-6;
+  font-size: t.$font-size-sm;
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: t.$space-1;
+  }
+
+  .toggle {
+    flex-direction: row;
+    align-items: center;
+    gap: t.$space-2;
+  }
+
+  input:not([type='checkbox']),
+  select {
+    padding: t.$space-1 t.$space-2;
+    border: t.$border-width solid var(--color-border);
+    border-radius: t.$radius-sm;
+    background: var(--color-bg);
+    color: var(--color-text);
+    font: inherit;
+    @include m.focus-ring;
+  }
+
+  input[type='number'] {
+    width: t.$width-field-sm;
+  }
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: t.$font-size-sm;
+}
+
+th,
+td {
+  padding: t.$space-2 t.$space-3;
+  border-bottom: t.$border-width solid var(--color-border);
+  text-align: left;
+}
+
+th {
+  font-weight: t.$font-weight-bold;
+}
+
+.number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.badge {
+  padding: 0 t.$space-2;
+  border-radius: t.$radius-sm;
+  white-space: nowrap;
+
+  &.done {
+    @include m.status(success);
+  }
+
+  &.failed,
+  &.no_preview {
+    @include m.status(danger);
+  }
+
+  &.pending {
+    @include m.text-muted;
+  }
+}
+
+.pager {
+  display: flex;
+  gap: t.$space-2;
+  margin-top: t.$space-4;
+}
+
+button,
+.button {
+  @include m.button-primary;
+}
+
+button.secondary {
+  @include m.button-secondary;
+}
