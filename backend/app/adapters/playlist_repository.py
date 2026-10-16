@@ -253,7 +253,8 @@ class PlaylistRepository:
     ) -> list[PlaylistItemRow]:
         """Morceaux dans l'ordre (valeurs vues par le propriétaire) et enchaînement vers le suivant."""
         rows = await self._db.fetch_all(
-            _ITEMS_SQL, {"owner": owner_id, "playlist_id": playlist_id, "tolerance": bpm_tolerance}
+            _ITEMS_SQL,
+            {"owner": owner_id, "user_id": owner_id, "playlist_id": playlist_id, "tolerance": bpm_tolerance},
         )
         return [
             PlaylistItemRow(

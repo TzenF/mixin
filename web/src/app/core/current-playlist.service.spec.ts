@@ -33,6 +33,7 @@ function detail(id: string, trackIds: string[]): PlaylistDetail {
         key_source: null,
         key_confidence: null,
         analysis_status: 'pending',
+        favorite: false,
       },
     })),
   };

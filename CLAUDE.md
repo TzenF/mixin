@@ -97,12 +97,14 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Valeur BPM/tonalité à afficher | SQL `effective_features(user)` |
 | Règle d'enchaînement entre deux morceaux | SQL `transition(a_bpm, a_num, a_letter, b_bpm, b_num, b_letter, tolerance)` (migrations 003–004) : utilisée par `suggest_tracks` et les playlists |
 | Morceaux compatibles | SQL `suggest_tracks(user, seed, tolerance, limit)`, via `TrackRepository.suggestions` (filtre « mes morceaux » appliqué avant la limite) |
-| SQL partagé du dépôt des morceaux | `track_repository.py` → `_ARTISTS_SQL` (artistes dans l'ordre), `_MINE_SQL` (« mes morceaux ») |
+| SQL partagé du dépôt des morceaux | `track_repository.py` → `_ARTISTS_SQL` (artistes dans l'ordre), `_MINE_SQL` (« mes morceaux » = mes playlists + mes favoris), `_FAVORITE_SQL`, `_FAVORITES_ONLY_SQL` |
+| Favoris | `TrackRepository.set_favorite` ; routes `PUT` / `DELETE /tracks/{id}/favorite` ; champ `favorite` et filtre `favorites=true` (catalogue, suggestions) |
 | Styles | `web/src/styles/_tokens.scss`, `_mixins.scss` (`page`, `panel`, `status`, `reset-list`, `button-primary`, `button-secondary`, `icon-button`, `card-button`, `badge`, `field`, `filter-bar`, `focus-ring`, `text-muted`, `text-danger`) |
 | Message d'erreur d'API (front) | `web/src/app/core/api/api-error.ts` → `apiErrorMessage` |
 | Session côté front | `web/src/app/core/api/auth.service.ts` → `AuthService`, `SPOTIFY_LOGIN_URL` |
 | Playlists côté front | `web/src/app/core/api/playlist.service.ts` → `PlaylistService` |
 | Playlist « en cours » (front) | `web/src/app/core/current-playlist.service.ts` → `CurrentPlaylistService` ; pour les tests des pages : `FakeCurrentPlaylistService` (`current-playlist.service.fake.ts`) |
+| Bouton ★ / ☆ (front) | `web/src/app/shared/favorite-button/` |
 | Bouton « + Ajouter », barre « Playlist en cours » | `web/src/app/shared/add-to-playlist/`, `web/src/app/shared/current-playlist-bar/` |
 | Libellés et texte d'un enchaînement, écart de BPM signé (front) | `web/src/app/shared/key-moves.ts` → `KEY_MOVE_LABELS`, `formatBpmChange`, `describeTransition` |
 | Playlist en texte (TXT détaillé ou tracklist) | `web/src/app/shared/playlist-text.ts` → `playlistText`, `playlistFileName` (généré côté front : pas de route API) |
@@ -218,6 +220,8 @@ réécrite se vérifie avant/après dans une transaction `REPEATABLE READ` (rés
   base 0, n'exécute pas leurs tâches.
 - **Écart de BPM : `bpm_diff` (absolu, sert au score) ≠ `bpm_change` (signé en %, sert à l'affichage)**. Un
   enchaînement refusé garde `key_distance` et `tempo_ok` / `same_mode` pour expliquer pourquoi.
+- **Fixtures `client` et `logged_in_client` = le même objet** (la seconde ajoute le cookie à la première) : pour
+  tester un 401, écrire un test séparé qui ne demande que `client`.
 - **Les tests PostgreSQL tournent sur la base de dev** (choix assumé), qui contient de vrais morceaux
   analysés : un test ne vérifie que **ses propres lignes** (filtre sur ses ID ou son `test_prefix`), jamais
   « le résultat entier ».
@@ -249,8 +253,9 @@ Fait : spikes, schéma, squelette (Compose, API, worker, front, CI), règles de 
 playlists, worker d'analyse (Deezer + Essentia), catalogue filtrable (page `/catalog`), bouton
 « inverser majeur/mineur », page d'accueil, page Suggestions (`/suggestions/:trackId`, enchaînement au clic), playlists (lecture avec
 la qualité des enchaînements, playlist en cours + « + Ajouter », glisser-déposer `@angular/cdk`), export vers
-Spotify (playlist privée, réexport = mise à jour), export TXT (détaillé ou tracklist). **Non vérifié** : la playlist exportée apparaît dans rekordbox.
-À faire, dans l'ordre : favoris → corrections manuelles (corriger un BPM, saisir une tonalité,
+Spotify (playlist privée, réexport = mise à jour), export TXT (détaillé ou tracklist),
+favoris (★, filtre, comptent dans « mes morceaux » ; pas d'import des titres likés Spotify). **Non vérifié** : la playlist exportée apparaît dans rekordbox.
+À faire : corrections manuelles (corriger un BPM, saisir une tonalité,
 annuler une correction).
 
 Retirés (16/10/2026) : **import XML rekordbox** (l'autrice utilise rekordbox seulement comme destination, via

@@ -226,3 +226,42 @@ def test_get_one_track(logged_in_client: TestClient, catalog: str) -> None:
     assert resp.status_code == 200
     assert resp.json() == gamma
     assert logged_in_client.get(f"/tracks/{uuid.uuid4()}").status_code == 404
+
+
+def test_favorite_is_idempotent_and_counts_as_mine(logged_in_client: TestClient, catalog: str) -> None:
+    gamma = _row(logged_in_client, catalog, "Gamma")  # hors de mes playlists
+    assert gamma["favorite"] is False
+    assert "Gamma" not in _titles(_get(logged_in_client, catalog), catalog)
+
+    for _ in range(2):  # deux fois : sans effet la seconde
+        assert logged_in_client.put(f"/tracks/{gamma['id']}/favorite").status_code == 204
+    assert _row(logged_in_client, catalog, "Gamma")["favorite"] is True
+    assert _titles(_get(logged_in_client, catalog), catalog) == ["Alpha", "Beta", "Delta_x", "Gamma"]
+
+    for _ in range(2):
+        assert logged_in_client.delete(f"/tracks/{gamma['id']}/favorite").status_code == 204
+    assert "Gamma" not in _titles(_get(logged_in_client, catalog), catalog)
+
+
+def test_favorites_filter_in_catalog_and_suggestions(logged_in_client: TestClient, catalog: str) -> None:
+    alpha = _row(logged_in_client, catalog, "Alpha")
+    gamma = _row(logged_in_client, catalog, "Gamma")
+    assert _get(logged_in_client, catalog, favorites="true")["total"] == 0
+
+    logged_in_client.put(f"/tracks/{gamma['id']}/favorite")
+    assert _titles(_get(logged_in_client, catalog, favorites="true", scope="all"), catalog) == ["Gamma"]
+
+    (suggested,) = _suggested(logged_in_client, alpha["id"], catalog, favorites="true")  # Gamma, favori
+    assert (suggested["title"], suggested["favorite"]) == (f"{catalog} Gamma", True)
+    logged_in_client.delete(f"/tracks/{gamma['id']}/favorite")
+    assert _suggested(logged_in_client, alpha["id"], catalog, favorites="true") == []
+
+
+def test_favorite_of_an_unknown_track(logged_in_client: TestClient) -> None:
+    assert logged_in_client.put(f"/tracks/{uuid.uuid4()}/favorite").status_code == 404
+
+
+def test_favorites_require_a_session(client: TestClient) -> None:
+    # Pas logged_in_client dans le même test : c'est le même objet que client, avec le cookie en plus
+    assert client.put(f"/tracks/{uuid.uuid4()}/favorite").status_code == 401
+    assert client.delete(f"/tracks/{uuid.uuid4()}/favorite").status_code == 401

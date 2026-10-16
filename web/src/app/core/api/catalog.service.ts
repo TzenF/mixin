@@ -19,6 +19,7 @@ export interface CatalogTrack {
   key_source: string | null;
   key_confidence: number | null;
   analysis_status: AnalysisStatus;
+  favorite: boolean;
 }
 
 /** Une page du catalogue ; total = nombre de morceaux qui passent les filtres. */
@@ -42,6 +43,7 @@ export interface Suggestion {
   half_double: boolean;
   bpm_diff_pct: number;
   score: number;
+  favorite: boolean;
 }
 
 /** Réglages des suggestions. */
@@ -49,6 +51,8 @@ export interface SuggestionOptions {
   scope: 'mine' | 'all';
   /** Écart de BPM accepté, en fraction (0.06 = ±6 %). */
   bpmTolerance: number;
+  /** Seulement mes favoris. */
+  favoritesOnly: boolean;
 }
 
 /** Tonalité affichée après une correction perso. */
@@ -68,6 +72,8 @@ export interface CatalogQuery {
   sort: CatalogSort;
   limit: number;
   offset: number;
+  /** Seulement mes favoris. */
+  favoritesOnly: boolean;
 }
 
 /** Catalogue des morceaux : les miens (playlists importées) ou tous. */
@@ -94,6 +100,9 @@ export class CatalogService {
         params = params.set(name, value);
       }
     }
+    if (query.favoritesOnly) {
+      params = params.set('favorites', true);
+    }
     return this.http.get<CatalogPage>('/api/tracks', { params });
   }
 
@@ -112,11 +121,20 @@ export class CatalogService {
 
   /** Morceaux qui s'enchaînent bien après ce morceau, du meilleur au moins bon. */
   suggestions(trackId: string, options: SuggestionOptions): Observable<Suggestion[]> {
-    const params = new HttpParams()
+    let params = new HttpParams()
       .set('scope', options.scope)
       .set('bpm_tolerance', options.bpmTolerance);
+    if (options.favoritesOnly) {
+      params = params.set('favorites', true);
+    }
     return this.http.get<Suggestion[]>(`/api/tracks/${encodeURIComponent(trackId)}/suggestions`, {
       params,
     });
+  }
+
+  /** Met le morceau dans mes favoris, ou l'en retire. */
+  setFavorite(trackId: string, favorite: boolean): Observable<void> {
+    const url = `/api/tracks/${encodeURIComponent(trackId)}/favorite`;
+    return favorite ? this.http.put<void>(url, null) : this.http.delete<void>(url);
   }
 }

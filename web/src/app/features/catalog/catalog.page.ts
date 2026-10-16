@@ -14,6 +14,7 @@ import {
   CatalogTrack,
 } from '../../core/api/catalog.service';
 import { AddToPlaylistComponent } from '../../shared/add-to-playlist/add-to-playlist.component';
+import { FavoriteButtonComponent } from '../../shared/favorite-button/favorite-button.component';
 import { CurrentPlaylistBarComponent } from '../../shared/current-playlist-bar/current-playlist-bar.component';
 
 const PAGE_SIZE = 50;
@@ -38,7 +39,12 @@ type State =
 /** Page « Catalogue » : mes morceaux (ou tous), filtrés et triés, avec BPM et tonalité. */
 @Component({
   selector: 'app-catalog-page',
-  imports: [DecimalPipe, AddToPlaylistComponent, CurrentPlaylistBarComponent],
+  imports: [
+    DecimalPipe,
+    AddToPlaylistComponent,
+    CurrentPlaylistBarComponent,
+    FavoriteButtonComponent,
+  ],
   templateUrl: './catalog.page.html',
   styleUrl: './catalog.page.scss',
 })
@@ -117,6 +123,11 @@ export class CatalogPage {
               },
         ),
     });
+  }
+
+  /** N'affiche que mes favoris (ou tout). */
+  protected setFavoritesOnly(favoritesOnly: boolean): void {
+    this.applyFilters({ favoritesOnly });
   }
 
   /** Bascule entre mes morceaux et tous les morceaux de la base. */
@@ -252,6 +263,7 @@ function queryFromUrl(params: ParamMap): CatalogQuery {
     key: params.get('key') ?? '',
     status: isStatus(status) ? status : '',
     sort: isSort(sort) ? sort : 'title',
+    favoritesOnly: params.get('favorites') === '1',
     limit: PAGE_SIZE,
     offset: (page - 1) * PAGE_SIZE,
   };
@@ -268,6 +280,7 @@ function queryToUrl(query: CatalogQuery): Params {
     key: query.key.trim() || null,
     status: query.status || null,
     sort: query.sort === 'title' ? null : query.sort,
+    favorites: query.favoritesOnly ? 1 : null,
     page: page > 1 ? page : null,
   };
 }

@@ -13,6 +13,16 @@
       Tous les morceaux
     </label>
 
+    <label class="toggle">
+      <input
+        type="checkbox"
+        [checked]="query().favoritesOnly"
+        (change)="setFavoritesOnly(checkedOf($event))"
+        data-testid="favorites-only"
+      />
+      Favoris seulement
+    </label>
+
     <label>
       Recherche
       <input
@@ -105,6 +115,7 @@
       <table data-testid="tracks">
         <thead>
           <tr>
+            <th scope="col" aria-label="Favori"></th>
             <th scope="col">Titre</th>
             <th scope="col">Artistes</th>
             <th scope="col" class="number">BPM</th>
@@ -116,6 +127,9 @@
         <tbody>
           @for (track of page.items; track track.id) {
             <tr data-testid="track-row">
+              <td>
+                <app-favorite-button [trackId]="track.id" [favorite]="track.favorite" />
+              </td>
               <td>{{ track.title }}</td>
               <td class="muted">{{ track.artists.join(', ') }}</td>
               <td class="number" data-testid="bpm">

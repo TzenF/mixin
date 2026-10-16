@@ -1,0 +1,10 @@
+@use 'mixins' as m;
+
+button {
+  @include m.icon-button;
+  margin-left: 0;
+
+  &.on {
+    color: var(--color-primary);
+  }
+}

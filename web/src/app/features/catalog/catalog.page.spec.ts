@@ -21,6 +21,7 @@ const ALPHA: CatalogTrack = {
   key_source: 'essentia',
   key_confidence: 0.6,
   analysis_status: 'done',
+  favorite: false,
 };
 const PENDING: CatalogTrack = {
   ...ALPHA,
@@ -219,6 +220,26 @@ describe('CatalogPage', () => {
     expect(
       root.querySelectorAll('[data-testid="track-row"] [data-testid="add-to-playlist"]').length,
     ).toBe(2);
+  });
+
+  it('filtre sur mes favoris et l’inscrit dans l’URL', async () => {
+    setup();
+    const fixture = await render();
+    const box = byTestId<HTMLInputElement>(fixture, 'favorites-only')!;
+    box.checked = true;
+    box.dispatchEvent(new Event('change'));
+
+    expect(paramsOf(pending())).toMatchObject({ favorites: 'true', offset: '0' });
+    expect(navigate).toHaveBeenLastCalledWith(
+      [],
+      expect.objectContaining({ queryParams: expect.objectContaining({ favorites: 1 }) }),
+    );
+  });
+
+  it('affiche ★ sur chaque ligne', async () => {
+    setup();
+    const fixture = await render({ total: 1, items: [{ ...ALPHA, favorite: true }] });
+    expect(byTestId(fixture, 'favorite')?.textContent?.trim()).toBe('★');
   });
 
   it('signale quand aucun morceau ne correspond', async () => {

@@ -157,6 +157,10 @@
                 >
               }
               <span class="index">{{ i + 1 }}</span>
+              <app-favorite-button
+                [trackId]="row.item.track.id"
+                [favorite]="row.item.track.favorite"
+              />
               <span class="what">
                 <span class="title">{{ row.item.track.title }}</span>
                 <span class="hint">{{ row.item.track.artists.join(', ') }}</span>

@@ -26,6 +26,7 @@ class CatalogFilters:
     limit: int = 50
     offset: int = 0
     track_id: UUID | None = None  # un seul morceau (fiche d'un morceau)
+    favorites_only: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,6 +42,7 @@ class CatalogRow:
     key_source: str | None
     key_confidence: float | None
     analysis_status: str
+    favorite: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +66,7 @@ class SuggestionRow:
     half_double: bool
     bpm_diff_pct: float
     score: float
+    favorite: bool
 
 
 # Artistes du morceau `t`, dans l'ordre d'affichage.
@@ -71,18 +74,26 @@ _ARTISTS_SQL = """COALESCE((SELECT array_agg(a.name ORDER BY ta.position)
                  FROM track_artist ta JOIN artist a ON a.id = ta.artist_id
                  WHERE ta.track_id = t.id), '{}')"""
 
-# « Mes morceaux » = ceux des playlists de l'utilisateur ; sans effet si only_mine est faux.
-_MINE_SQL = """(NOT %(only_mine)s OR EXISTS (
+# Le morceau `t` est un favori de l'utilisateur.
+_FAVORITE_SQL = (
+    """EXISTS (SELECT 1 FROM favorite fav WHERE fav.track_id = t.id AND fav.user_id = %(user_id)s::uuid)"""
+)
+
+# « Mes morceaux » = ceux de mes playlists et mes favoris ; sans effet si only_mine est faux.
+_MINE_SQL = f"""(NOT %(only_mine)s OR {_FAVORITE_SQL} OR EXISTS (
           SELECT 1 FROM playlist_item pi JOIN playlist p ON p.id = pi.playlist_id
           WHERE pi.track_id = t.id AND p.owner_id = %(user_id)s::uuid))"""
+
+# Seulement mes favoris ; sans effet si favorites_only est faux.
+_FAVORITES_ONLY_SQL = f"(NOT %(favorites_only)s OR {_FAVORITE_SQL})"
 
 # suggest_tracks est appelée sans limite (NULL) : le filtre « mes morceaux » s'applique avant la limite.
 _SUGGEST_SQL = f"""
 SELECT s.track_id, t.title, {_ARTISTS_SQL} AS artists, s.bpm::float AS bpm, s.camelot, s.key_move,
-       s.half_double, s.bpm_diff::float AS bpm_diff_pct, s.score::float AS score
+       s.half_double, s.bpm_diff::float AS bpm_diff_pct, s.score::float AS score, {_FAVORITE_SQL} AS favorite
 FROM suggest_tracks(%(user_id)s::uuid, %(seed)s::uuid, %(tolerance)s::numeric, NULL::integer) s
 JOIN track t ON t.id = s.track_id
-WHERE {_MINE_SQL}
+WHERE {_MINE_SQL} AND {_FAVORITES_ONLY_SQL}
 ORDER BY s.score DESC, lower(t.title), t.id
 LIMIT %(limit)s
 """
@@ -93,6 +104,7 @@ _CATALOG_FROM = f"""
 FROM track t
 LEFT JOIN effective_features(%(user_id)s::uuid) f ON f.track_id = t.id
 WHERE {_MINE_SQL}
+  AND {_FAVORITES_ONLY_SQL}
   AND (%(track_id)s::uuid IS NULL OR t.id = %(track_id)s::uuid)
   AND (%(text)s::text IS NULL OR t.title ILIKE %(text)s OR EXISTS (
           SELECT 1 FROM track_artist ta JOIN artist a ON a.id = ta.artist_id
@@ -111,7 +123,8 @@ TRACK_COLUMNS_SQL = f"""
        f.camelot_num || f.camelot_letter AS camelot,
        f.bpm_source::text AS bpm_source, f.key_source::text AS key_source,
        f.key_confidence::float AS key_confidence,
-       t.analysis_status::text AS analysis_status
+       t.analysis_status::text AS analysis_status,
+       {_FAVORITE_SQL} AS favorite
 """
 
 _CATALOG_SELECT = f"SELECT {TRACK_COLUMNS_SQL}"
@@ -173,6 +186,7 @@ class TrackRepository:
             "limit": filters.limit,
             "offset": filters.offset,
             "track_id": filters.track_id,
+            "favorites_only": filters.favorites_only,
         }
         # Deux requêtes : le total reste juste même quand la page demandée est vide.
         total = await self._db.fetch_one(f"SELECT count(*) AS n {_CATALOG_FROM}", params)
@@ -185,7 +199,13 @@ class TrackRepository:
         return CatalogPage(total=total["n"], items=[CatalogRow(**r) for r in rows])
 
     async def suggestions(
-        self, seed: UUID, user_id: UUID, bpm_tolerance: float, limit: int, only_mine: bool = True
+        self,
+        seed: UUID,
+        user_id: UUID,
+        bpm_tolerance: float,
+        limit: int,
+        only_mine: bool = True,
+        favorites_only: bool = False,
     ) -> list[SuggestionRow]:
         """Morceaux compatibles avec `seed`, du meilleur score au moins bon (voir suggest_tracks en SQL)."""
         rows = await self._db.fetch_all(
@@ -196,9 +216,19 @@ class TrackRepository:
                 "tolerance": bpm_tolerance,
                 "limit": limit,
                 "only_mine": only_mine,
+                "favorites_only": favorites_only,
             },
         )
         return [SuggestionRow(**r) for r in rows]
+
+    async def set_favorite(self, user_id: UUID, track_id: UUID, favorite: bool) -> None:
+        """Marque ou démarque le morceau comme favori de l'utilisateur (sans effet s'il l'est déjà)."""
+        if favorite:
+            sql = """INSERT INTO favorite (user_id, track_id) VALUES (%(user_id)s, %(track_id)s)
+                     ON CONFLICT DO NOTHING"""
+        else:
+            sql = "DELETE FROM favorite WHERE user_id = %(user_id)s AND track_id = %(track_id)s"
+        await self._db.fetch_one(sql, {"user_id": user_id, "track_id": track_id})
 
     async def find_by_isrc(self, isrc: str) -> UUID | None:
         """Renvoie le morceau qui a cet ISRC, ou None."""

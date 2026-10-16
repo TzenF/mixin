@@ -1,0 +1,14 @@
+<button
+  type="button"
+  [class.on]="isFavorite()"
+  [disabled]="saving()"
+  [attr.aria-pressed]="isFavorite()"
+  [title]="
+    failed() ? 'Échec : réessaie' : isFavorite() ? 'Retirer des favoris' : 'Ajouter aux favoris'
+  "
+  [attr.aria-label]="isFavorite() ? 'Retirer des favoris' : 'Ajouter aux favoris'"
+  (click)="toggle()"
+  data-testid="favorite"
+>
+  {{ isFavorite() ? '★' : '☆' }}
+</button>

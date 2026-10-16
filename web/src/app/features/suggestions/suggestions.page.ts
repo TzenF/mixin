@@ -13,6 +13,7 @@ import {
   SuggestionOptions,
 } from '../../core/api/catalog.service';
 import { AddToPlaylistComponent } from '../../shared/add-to-playlist/add-to-playlist.component';
+import { FavoriteButtonComponent } from '../../shared/favorite-button/favorite-button.component';
 import { CurrentPlaylistBarComponent } from '../../shared/current-playlist-bar/current-playlist-bar.component';
 import { KEY_MOVE_LABELS } from '../../shared/key-moves';
 
@@ -30,7 +31,12 @@ type State =
 /** Page « Suggestions » : les morceaux qui s'enchaînent bien après un morceau ; un clic enchaîne. */
 @Component({
   selector: 'app-suggestions-page',
-  imports: [DecimalPipe, AddToPlaylistComponent, CurrentPlaylistBarComponent],
+  imports: [
+    DecimalPipe,
+    AddToPlaylistComponent,
+    CurrentPlaylistBarComponent,
+    FavoriteButtonComponent,
+  ],
   templateUrl: './suggestions.page.html',
   styleUrl: './suggestions.page.scss',
 })
@@ -93,6 +99,11 @@ export class SuggestionsPage {
     });
   }
 
+  /** Ne suggère que mes favoris (ou tout). */
+  protected setFavoritesOnly(favoritesOnly: boolean): void {
+    this.changeOptions({ favoritesOnly });
+  }
+
   /** Bascule entre mes morceaux et tous les morceaux de la base. */
   protected setShowAll(all: boolean): void {
     this.changeOptions({ scope: all ? 'all' : 'mine' });
@@ -151,12 +162,13 @@ export class SuggestionsPage {
   /** Applique un changement de réglage : recopié dans l'URL, puis rechargement. */
   private changeOptions(change: Partial<SuggestionOptions>): void {
     this.options.update((o) => ({ ...o, ...change }));
-    const { scope, bpmTolerance } = this.options();
+    const { scope, bpmTolerance, favoritesOnly } = this.options();
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: {
         scope: scope === 'all' ? 'all' : null,
         tolerance: bpmTolerance === DEFAULT_TOLERANCE ? null : bpmTolerance,
+        favorites: favoritesOnly ? 1 : null,
       },
       replaceUrl: true,
     });
@@ -171,6 +183,7 @@ function optionsFromUrl(route: ActivatedRoute): SuggestionOptions {
   return {
     scope: params.get('scope') === 'all' ? 'all' : 'mine',
     bpmTolerance: isTolerance(tolerance) ? tolerance : DEFAULT_TOLERANCE,
+    favoritesOnly: params.get('favorites') === '1',
   };
 }
 

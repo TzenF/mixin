@@ -22,6 +22,7 @@ const TRACK: CatalogTrack = {
   key_source: 'essentia',
   key_confidence: 0.6,
   analysis_status: 'done',
+  favorite: false,
 };
 const GOOD: Transition = {
   key_move: 'adjacent',

@@ -4,7 +4,7 @@ from dataclasses import asdict
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel
 
 from app.adapters.db import Database
@@ -35,6 +35,7 @@ class CatalogTrack(BaseModel):
     key_source: str | None
     key_confidence: float | None
     analysis_status: AnalysisStatus
+    favorite: bool
 
 
 class Catalog(BaseModel):
@@ -57,6 +58,7 @@ async def catalog(
     sort: CatalogSort = "title",
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
+    favorites: bool = False,
 ) -> Catalog:
     """Liste les morceaux (les miens, ou tous avec scope=all), filtrés et triés, page par page."""
     try:
@@ -75,6 +77,7 @@ async def catalog(
             sort=sort,
             limit=limit,
             offset=offset,
+            favorites_only=favorites,
         ),
     )
     return Catalog(total=page.total, items=[CatalogTrack(**asdict(r)) for r in page.items])
@@ -92,6 +95,7 @@ class Suggestion(BaseModel):
     half_double: bool
     bpm_diff_pct: float
     score: float
+    favorite: bool
 
 
 async def _ensure_exists(tracks: TrackRepository, track_id: UUID) -> None:
@@ -108,12 +112,18 @@ async def suggestions(
     scope: Literal["mine", "all"] = "mine",
     bpm_tolerance: Annotated[float, Query(gt=0, le=0.2)] = DEFAULT_BPM_TOLERANCE,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    favorites: bool = False,
 ) -> list[Suggestion]:
     """Liste les morceaux (les miens, ou tous avec scope=all) qui s'enchaînent bien après `track_id`."""
     await _ensure_exists(tracks, track_id)
     # Avec l'utilisateur : ses valeurs rekordbox et ses corrections passent avant Essentia.
     rows = await tracks.suggestions(
-        track_id, user_id=user_id, bpm_tolerance=bpm_tolerance, limit=limit, only_mine=scope == "mine"
+        track_id,
+        user_id=user_id,
+        bpm_tolerance=bpm_tolerance,
+        limit=limit,
+        only_mine=scope == "mine",
+        favorites_only=favorites,
     )
     return [Suggestion(**asdict(r)) for r in rows]
 
@@ -166,3 +176,18 @@ async def flip_key_mode(
     except NoKeyToFlipError as e:
         raise HTTPException(status.HTTP_409_CONFLICT, str(e)) from e
     return KeyCorrected(camelot=str(key))
+
+
+@router.put("/{track_id}/favorite", status_code=status.HTTP_204_NO_CONTENT)
+async def add_favorite(track_id: UUID, tracks: Tracks, user_id: CurrentUser) -> Response:
+    """Met le morceau dans mes favoris (sans effet s'il y est déjà) ; 404 s'il n'existe pas."""
+    await _ensure_exists(tracks, track_id)
+    await tracks.set_favorite(user_id, track_id, favorite=True)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/{track_id}/favorite", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_favorite(track_id: UUID, tracks: Tracks, user_id: CurrentUser) -> Response:
+    """Retire le morceau de mes favoris (sans effet s'il n'y est pas)."""
+    await tracks.set_favorite(user_id, track_id, favorite=False)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -18,6 +18,7 @@ const SEED: CatalogTrack = {
   key_source: 'essentia',
   key_confidence: 0.6,
   analysis_status: 'done',
+  favorite: false,
 };
 const ROCK: Suggestion = {
   track_id: 'rock',
@@ -29,6 +30,7 @@ const ROCK: Suggestion = {
   half_double: false,
   bpm_diff_pct: 0.8,
   score: 0.777,
+  favorite: false,
 };
 const DOUBLE: Suggestion = {
   ...ROCK,
@@ -126,6 +128,22 @@ describe('SuggestionsPage', () => {
     expect(suggestionParams()).toEqual({ scope: 'mine', bpm_tolerance: '0.06' });
   });
 
+  it('ne suggère que mes favoris si demandé (case ou URL)', async () => {
+    setup({ favorites: '1' });
+    const fixture = create();
+    http.expectOne('/api/tracks/seed').flush(SEED);
+    const req = http.expectOne((r) => r.url === '/api/tracks/seed/suggestions');
+    expect(req.request.params.get('favorites')).toBe('true');
+    req.flush([{ ...ROCK, favorite: true }]);
+    await fixture.whenStable();
+
+    expect(byTestId<HTMLInputElement>(fixture, 'favorites-only')?.checked).toBe(true);
+    const stars = (fixture.nativeElement as HTMLElement).querySelectorAll(
+      '[data-testid="favorite"]',
+    );
+    expect(Array.from(stars).map((s) => s.textContent?.trim())).toEqual(['☆', '★']); // départ, suggestion
+  });
+
   it("reprend les réglages présents dans l'URL", async () => {
     setup({ scope: 'all', tolerance: '0.1' });
     const fixture = create();
@@ -163,7 +181,10 @@ describe('SuggestionsPage', () => {
     expect(suggestionParams()).toEqual({ scope: 'mine', bpm_tolerance: '0.1' });
     expect(navigate).toHaveBeenLastCalledWith(
       [],
-      expect.objectContaining({ queryParams: { scope: null, tolerance: 0.1 }, replaceUrl: true }),
+      expect.objectContaining({
+        queryParams: { scope: null, tolerance: 0.1, favorites: null },
+        replaceUrl: true,
+      }),
     );
   });
 

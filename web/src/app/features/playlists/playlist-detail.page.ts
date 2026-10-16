@@ -20,6 +20,7 @@ import {
 } from '../../core/api/playlist.service';
 import { CurrentPlaylistService } from '../../core/current-playlist.service';
 import { FileDownloadService } from '../../core/file-download.service';
+import { FavoriteButtonComponent } from '../../shared/favorite-button/favorite-button.component';
 import { describeTransition } from '../../shared/key-moves';
 import { PlaylistTextFormat, playlistFileName, playlistText } from '../../shared/playlist-text';
 
@@ -33,7 +34,7 @@ type State =
 /** Page « Playlist » : morceaux dans l'ordre et qualité de chaque enchaînement. */
 @Component({
   selector: 'app-playlist-detail-page',
-  imports: [DatePipe, DecimalPipe, CdkDropList, CdkDrag, CdkDragHandle],
+  imports: [DatePipe, DecimalPipe, CdkDropList, CdkDrag, CdkDragHandle, FavoriteButtonComponent],
   templateUrl: './playlist-detail.page.html',
   styleUrl: './playlist-detail.page.scss',
 })

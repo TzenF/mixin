@@ -316,3 +316,12 @@ def test_order_and_removal_require_a_session(client: TestClient) -> None:
     some_id = uuid.uuid4()
     assert client.put(f"/playlists/{some_id}/order", json={"item_ids": []}).status_code == 401
     assert client.delete(f"/playlists/{some_id}/items/1").status_code == 401
+
+
+def test_detail_shows_favorites(
+    logged_in_client: TestClient, playlists: dict[str, str], test_prefix: str
+) -> None:
+    b = _track_id(test_prefix, "B")
+    logged_in_client.put(f"/tracks/{b}/favorite")
+    items = _detail(logged_in_client, playlists["mine"])["items"]
+    assert [i["track"]["favorite"] for i in items] == [False, True, False, False, False]
