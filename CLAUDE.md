@@ -72,7 +72,7 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Requêtes SQL | `app/adapters/db.py` → `Database.fetch_all` / `fetch_one` (depuis un dépôt uniquement) |
 | Plusieurs écritures atomiques | `Database.transaction()` → objet `Transaction` ; les dépôts acceptent un `Queryable` (base ou transaction) |
 | Morceaux en base | `app/adapters/track_repository.py` → `TrackRepository` (dont `find_by_isrc`, `find_by_external_id`, `set_artists`) |
-| Catalogue filtré (mes morceaux ou tous) | `TrackRepository.catalog(user, CatalogFilters)` ; route `GET /tracks` |
+| Catalogue filtré (mes morceaux ou tous) | `TrackRepository.catalog(user, CatalogFilters)` ; routes `GET /tracks`, `GET /tracks/{id}` (`CatalogFilters.track_id`) |
 | Utilisateurs, comptes musicaux | `app/adapters/user_repository.py` → `UserRepository` |
 | Sessions de connexion | `app/services/sessions.py` → `SessionService` (dépôt : `SessionRepository`) |
 | Playlists en base | `app/adapters/playlist_repository.py` → `PlaylistRepository` |
@@ -93,11 +93,12 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Dépendances de route | `app/api/deps.py` → `get_db`, `get_queue`, `get_track_repository`, `get_current_user_id` (exige une session) |
 | Erreur de service musical → HTTP | `app/api/errors.py` (404 / 401 / 502, déjà branché) |
 | Valeur BPM/tonalité à afficher | SQL `effective_features(user)` |
-| Morceaux compatibles | SQL `suggest_tracks(user, seed, tolerance, limit)` |
-| Styles | `web/src/styles/_tokens.scss`, `_mixins.scss` (`page`, `panel`, `status`, `reset-list`, `button-primary`, `button-secondary`, `focus-ring`, `text-muted`, `text-danger`) |
+| Morceaux compatibles | SQL `suggest_tracks(user, seed, tolerance, limit)`, via `TrackRepository.suggestions` (filtre « mes morceaux » appliqué avant la limite) |
+| SQL partagé du dépôt des morceaux | `track_repository.py` → `_ARTISTS_SQL` (artistes dans l'ordre), `_MINE_SQL` (« mes morceaux ») |
+| Styles | `web/src/styles/_tokens.scss`, `_mixins.scss` (`page`, `panel`, `status`, `reset-list`, `button-primary`, `button-secondary`, `icon-button`, `field`, `filter-bar`, `focus-ring`, `text-muted`, `text-danger`) |
 | Message d'erreur d'API (front) | `web/src/app/core/api/api-error.ts` → `apiErrorMessage` |
 | Session côté front | `web/src/app/core/api/auth.service.ts` → `AuthService`, `SPOTIFY_LOGIN_URL` |
-| Catalogue côté front | `web/src/app/core/api/catalog.service.ts` → `CatalogService` (types `CatalogTrack`, `AnalysisStatus`) |
+| Catalogue côté front | `web/src/app/core/api/catalog.service.ts` → `CatalogService` (`tracks`, `track`, `suggestions`, `flipMode`) |
 
 Tenir ce tableau à jour quand on ajoute un élément réutilisable.
 
@@ -225,8 +226,8 @@ appel) et en-têtes de sécurité (CSP, HSTS), sauvegardes PostgreSQL, worker su
 
 Fait : spikes, schéma, squelette (Compose, API, worker, front, CI), règles de code, OAuth Spotify + import des
 playlists, worker d'analyse (Deezer + Essentia), catalogue filtrable (page `/catalog`), bouton
-« inverser majeur/mineur », page d'accueil.
-À faire, dans l'ordre : suggestions, playlists, favoris → export Spotify / TXT / M3U → import XML rekordbox (avec écran des morceaux
+« inverser majeur/mineur », page d'accueil, page Suggestions (`/suggestions/:trackId`, enchaînement au clic).
+À faire, dans l'ordre : playlists, favoris → export Spotify / TXT / M3U → import XML rekordbox (avec écran des morceaux
 non reconnus) et corrections manuelles.
 
 Hors V1 (ne pas anticiper) : extraits audio dans le navigateur, partage/commentaires, page Discover,
