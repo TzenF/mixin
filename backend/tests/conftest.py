@@ -6,6 +6,7 @@ S'ils ne sont pas joignables, les tests d'intégration sont ignorés plutôt qu'
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import AsyncIterator, Iterator
 
@@ -15,7 +16,9 @@ import redis
 from fastapi.testclient import TestClient
 
 from app.adapters.db import Database
+from app.api.deps import SESSION_COOKIE
 from app.config import get_settings
+from app.services.sessions import SessionService
 
 
 def _services_up() -> bool:
@@ -39,6 +42,22 @@ def client() -> Iterator[TestClient]:
 
     with TestClient(create_app()) as c:
         yield c
+
+
+@pytest.fixture
+def logged_in_client(client: TestClient, user_id: uuid.UUID) -> TestClient:
+    """Client de test avec une session ouverte pour un utilisateur jetable."""
+
+    async def open_session() -> str:
+        """Ouvre une session en base et renvoie son jeton."""
+        database = await Database.connect(get_settings().database_url)
+        try:
+            return await SessionService(database, days=1).open(user_id)
+        finally:
+            await database.close()
+
+    client.cookies.set(SESSION_COOKIE, asyncio.run(open_session()))
+    return client
 
 
 @pytest.fixture

@@ -82,6 +82,10 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Lire Spotify | `app/adapters/spotify_provider.py` → `SpotifyProvider` |
 | Importer une playlist | `app/services/playlist_import.py` → `PlaylistImporter` |
 | Lancer une analyse | `app/adapters/queue.py` → `TaskQueue.enqueue_analysis` (déjà dédoublonné) |
+| Analyser un morceau (exécuté par le worker) | `app/services/track_analysis.py` → `TrackAnalyzer` |
+| Extrait Deezer par ISRC | `app/adapters/deezer_client.py` → `DeezerClient` (`DeezerUnavailableError` = réessayer plus tard) |
+| Valeurs Essentia en base | `app/adapters/analysis_repository.py` → `AnalysisRepository` |
+| Test d'une route qui exige une session | fixture `logged_in_client` (`tests/conftest.py`) |
 | Dépendances de route | `app/api/deps.py` → `get_db`, `get_queue`, `get_track_repository`, `get_current_user_id` (exige une session) |
 | Erreur de service musical → HTTP | `app/api/errors.py` (404 / 401 / 502, déjà branché) |
 | Valeur BPM/tonalité à afficher | SQL `effective_features(user)` |
@@ -191,9 +195,8 @@ vide**. Nouveau fichier numéroté, puis `make reset-db` en dev.
 ## Feuille de route V1
 
 Fait : spikes, schéma, squelette (Compose, API, worker, front, CI), règles de code, OAuth Spotify + import des
-playlists.
-À faire, dans l'ordre : worker Deezer + Essentia → catalogue filtrable,
-suggestions, playlists, favoris → export Spotify / TXT / M3U → import XML rekordbox (avec écran des morceaux
+playlists, worker d'analyse (Deezer + Essentia).
+À faire, dans l'ordre : catalogue filtrable, suggestions, playlists, favoris → export Spotify / TXT / M3U → import XML rekordbox (avec écran des morceaux
 non reconnus) et corrections manuelles.
 
 Hors V1 (ne pas anticiper) : extraits audio dans le navigateur, partage/commentaires, page Discover,

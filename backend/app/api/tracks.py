@@ -1,7 +1,4 @@
-"""Premières routes métier : suggestions et demande d'analyse.
-
-Sert d'exemple de bout en bout (route -> dépôt -> fonction SQL) pour le reste du V1.
-"""
+"""Routes des morceaux : suggestions et demande d'analyse (réservées aux utilisateurs connectés)."""
 
 from dataclasses import asdict
 from typing import Annotated
@@ -12,11 +9,12 @@ from pydantic import BaseModel
 
 from app.adapters.queue import TaskQueue
 from app.adapters.track_repository import TrackRepository
-from app.api.deps import get_queue, get_track_repository
+from app.api.deps import get_current_user_id, get_queue, get_track_repository
 
 router = APIRouter(prefix="/tracks", tags=["tracks"])
 
 Tracks = Annotated[TrackRepository, Depends(get_track_repository)]
+CurrentUser = Annotated[UUID, Depends(get_current_user_id)]
 
 
 class Suggestion(BaseModel):
@@ -42,13 +40,14 @@ async def _ensure_exists(tracks: TrackRepository, track_id: UUID) -> None:
 async def suggestions(
     track_id: UUID,
     tracks: Tracks,
+    user_id: CurrentUser,
     bpm_tolerance: Annotated[float, Query(gt=0, le=0.2)] = 0.06,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> list[Suggestion]:
     """Liste les morceaux qui s'enchaînent bien après `track_id`, du meilleur au moins bon."""
     await _ensure_exists(tracks, track_id)
-    # TODO(auth) : passer l'utilisateur connecté pour appliquer ses corrections personnelles
-    rows = await tracks.suggestions(track_id, user_id=None, bpm_tolerance=bpm_tolerance, limit=limit)
+    # Avec l'utilisateur : ses valeurs rekordbox et ses corrections passent avant Essentia.
+    rows = await tracks.suggestions(track_id, user_id=user_id, bpm_tolerance=bpm_tolerance, limit=limit)
     return [Suggestion(**asdict(r)) for r in rows]
 
 
@@ -63,6 +62,7 @@ async def request_analysis(
     track_id: UUID,
     tracks: Tracks,
     queue: Annotated[TaskQueue, Depends(get_queue)],
+    _user_id: CurrentUser,
 ) -> AnalysisRequested:
     """Demande l'analyse audio d'un morceau ; elle sera faite par le worker."""
     await _ensure_exists(tracks, track_id)

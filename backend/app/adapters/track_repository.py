@@ -46,6 +46,13 @@ class TrackRepository:
         row = await self._db.fetch_one("SELECT isrc FROM track WHERE id = %(id)s", {"id": track_id})
         return row["isrc"] if row else None
 
+    async def set_analysis_status(self, track_id: UUID, status: str) -> None:
+        """Note où en est l'analyse du morceau : pending, done, no_preview ou failed."""
+        await self._db.fetch_one(
+            "UPDATE track SET analysis_status = %(status)s::analysis_status WHERE id = %(id)s",
+            {"id": track_id, "status": status},
+        )
+
     async def suggestions(
         self, seed: UUID, user_id: UUID | None, bpm_tolerance: float, limit: int
     ) -> list[SuggestionRow]:

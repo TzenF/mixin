@@ -13,8 +13,15 @@ def test_health(client: TestClient) -> None:
 
 
 @requires_services
-def test_suggestions(client: TestClient, tracks: dict[str, uuid.UUID]) -> None:
-    resp = client.get(f"/tracks/{tracks['Where Have You Been']}/suggestions")
+def test_tracks_routes_require_a_session(client: TestClient, tracks: dict[str, uuid.UUID]) -> None:
+    track_id = tracks["Where Have You Been"]
+    assert client.get(f"/tracks/{track_id}/suggestions").status_code == 401
+    assert client.post(f"/tracks/{track_id}/analysis").status_code == 401
+
+
+@requires_services
+def test_suggestions(logged_in_client: TestClient, tracks: dict[str, uuid.UUID]) -> None:
+    resp = logged_in_client.get(f"/tracks/{tracks['Where Have You Been']}/suggestions")
     assert resp.status_code == 200
     titles = [s["title"] for s in resp.json()]
     # 130.1 en 5A passe devant 129.7 en 4A ; 141.9 BPM (+10.5 %) est hors tolérance
@@ -23,14 +30,14 @@ def test_suggestions(client: TestClient, tracks: dict[str, uuid.UUID]) -> None:
 
 
 @requires_services
-def test_suggestions_unknown_track(client: TestClient) -> None:
-    assert client.get(f"/tracks/{uuid.uuid4()}/suggestions").status_code == 404
+def test_suggestions_unknown_track(logged_in_client: TestClient) -> None:
+    assert logged_in_client.get(f"/tracks/{uuid.uuid4()}/suggestions").status_code == 404
 
 
 @requires_services
-def test_request_analysis_is_deduplicated(client: TestClient, tracks: dict[str, uuid.UUID]) -> None:
+def test_request_analysis_is_deduplicated(logged_in_client: TestClient, tracks: dict[str, uuid.UUID]) -> None:
     url = f"/tracks/{tracks['Von dutch']}/analysis"
-    first, second = client.post(url), client.post(url)
+    first, second = logged_in_client.post(url), logged_in_client.post(url)
     assert first.status_code == second.status_code == 202
     assert first.json()["job_id"] is not None
     assert second.json()["job_id"] is None  # déjà en file : pas de doublon
