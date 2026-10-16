@@ -53,6 +53,13 @@ class TrackRepository:
             {"id": track_id, "status": status},
         )
 
+    async def pending_ids(self) -> list[UUID]:
+        """Morceaux dont l'analyse n'a pas encore abouti (statut pending), du plus ancien au plus récent."""
+        rows = await self._db.fetch_all(
+            "SELECT id FROM track WHERE analysis_status = 'pending' ORDER BY created_at, id"
+        )
+        return [r["id"] for r in rows]
+
     async def suggestions(
         self, seed: UUID, user_id: UUID | None, bpm_tolerance: float, limit: int
     ) -> list[SuggestionRow]:

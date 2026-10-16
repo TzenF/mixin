@@ -2,7 +2,7 @@
 export DOCKER_BUILDKIT := 0
 COMPOSE := docker compose
 
-.PHONY: up down logs test test-back test-front lint reset-db psql
+.PHONY: up down logs test test-back test-front lint reset-db psql analyze-pending
 
 up:            ## Construit et démarre tout (front, API, worker, base, Redis)
 	$(COMPOSE) up --build -d
@@ -31,3 +31,6 @@ reset-db:      ## Efface la base et rejoue les migrations (perte des données !)
 
 psql:          ## Ouvre un terminal SQL sur la base
 	$(COMPOSE) exec db psql -U dj -d dj
+
+analyze-pending: ## Met en file d'analyse les morceaux en attente (pending)
+	$(COMPOSE) exec api python -m app.worker.enqueue_pending

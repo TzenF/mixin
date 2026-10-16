@@ -11,7 +11,7 @@ from app.adapters.deezer_client import DeezerTrack, DeezerUnavailableError
 from app.adapters.track_repository import TrackRepository
 from app.domain.audio_features import AudioFeatures
 from app.domain.camelot import CamelotKey
-from app.services.track_analysis import TrackAnalyzer
+from app.services.track_analysis import TrackAnalyzer, enqueue_pending
 from tests.conftest import requires_services
 
 pytestmark = [pytest.mark.anyio, requires_services]
@@ -147,3 +147,31 @@ async def test_deezer_down_leaves_the_track_pending(db: Database, test_prefix: s
 async def test_unknown_track(db: Database) -> None:
     analyzer = TrackAnalyzer(db, FakeDeezer(), FakeEssentia(FEATURES))
     assert await analyzer.analyze(uuid.uuid4()) == "not_found"
+
+
+@dataclass
+class FakeQueue:
+    """Fausse file : note les morceaux reçus et refuse ceux qu'elle a déjà."""
+
+    queued: list[str] = field(default_factory=list)
+
+    async def enqueue_analysis(self, track_id: str) -> str | None:
+        """Met le morceau en file, sauf s'il y est déjà."""
+        if track_id in self.queued:
+            return None
+        self.queued.append(track_id)
+        return f"analyze:{track_id}"
+
+
+async def test_enqueue_pending_only_queues_pending_tracks(db: Database, test_prefix: str) -> None:
+    first, second, analysed = [await _track(db, f"{test_prefix}{i}") for i in range(3)]
+    await TrackRepository(db).set_analysis_status(analysed, "done")
+    queue = FakeQueue()
+
+    queued, already = await enqueue_pending(TrackRepository(db), queue)
+
+    # La base de dev peut contenir d'autres morceaux en attente : on ne regarde que ceux du test.
+    mine = [t for t in queue.queued if t in {str(first), str(second), str(analysed)}]
+    assert mine == [str(first), str(second)]
+    assert (queued, already) == (len(queue.queued), 0)
+    assert await enqueue_pending(TrackRepository(db), queue) == (0, len(queue.queued))

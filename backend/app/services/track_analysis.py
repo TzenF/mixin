@@ -18,6 +18,7 @@ from app.adapters.db import Database
 from app.adapters.deezer_client import DeezerTrack, DeezerUnavailableError
 from app.adapters.track_repository import TrackRepository
 from app.domain.audio_features import AudioFeatures
+from app.services.playlist_import import AnalysisQueue
 
 log = logging.getLogger(__name__)
 
@@ -95,3 +96,15 @@ class TrackAnalyzer:
             await self._previews.download(preview_url, path)
             # Essentia bloque le CPU plusieurs secondes : hors de la boucle, le worker reste réactif.
             return await asyncio.to_thread(self._analyzer.analyze, path)
+
+
+async def enqueue_pending(tracks: TrackRepository, queue: AnalysisQueue) -> tuple[int, int]:
+    """Met en file d'analyse les morceaux en attente ; renvoie (mis en file, déjà en file)."""
+    queued = already_queued = 0
+    for track_id in await tracks.pending_ids():
+        # La file refuse un morceau déjà en file (job_id fixe) : relancer la commande ne crée pas de doublon.
+        if await queue.enqueue_analysis(str(track_id)) is None:
+            already_queued += 1
+        else:
+            queued += 1
+    return queued, already_queued

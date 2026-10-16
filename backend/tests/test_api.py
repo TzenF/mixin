@@ -23,7 +23,9 @@ def test_tracks_routes_require_a_session(client: TestClient, tracks: dict[str, u
 def test_suggestions(logged_in_client: TestClient, tracks: dict[str, uuid.UUID]) -> None:
     resp = logged_in_client.get(f"/tracks/{tracks['Where Have You Been']}/suggestions")
     assert resp.status_code == 200
-    titles = [s["title"] for s in resp.json()]
+    # La base de dev contient d'autres morceaux analysés : on ne regarde que ceux du test.
+    mine = {str(t) for t in tracks.values()}
+    titles = [s["title"] for s in resp.json() if s["track_id"] in mine]
     # 130.1 en 5A passe devant 129.7 en 4A ; 141.9 BPM (+10.5 %) est hors tolérance
     assert titles[:2] == ["Don't Wake Me Up", "Von dutch"]
     assert "Dernière danse" not in titles
