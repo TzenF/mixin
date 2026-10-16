@@ -27,6 +27,12 @@ export interface CatalogPage {
   items: CatalogTrack[];
 }
 
+/** Tonalité affichée après une correction perso. */
+export interface KeyCorrected {
+  camelot: string;
+  key_source: 'manual';
+}
+
 /** Filtres, tri et page demandés ; une chaîne vide ou null = pas de filtre. */
 export interface CatalogQuery {
   scope: 'mine' | 'all';
@@ -65,5 +71,13 @@ export class CatalogService {
       }
     }
     return this.http.get<CatalogPage>('/api/tracks', { params });
+  }
+
+  /** Inverse majeur/mineur de la tonalité affichée (8A -> 11B), pour moi seulement ; 409 sans tonalité. */
+  flipMode(trackId: string): Observable<KeyCorrected> {
+    return this.http.post<KeyCorrected>(
+      `/api/tracks/${encodeURIComponent(trackId)}/key/flip-mode`,
+      null,
+    );
   }
 }

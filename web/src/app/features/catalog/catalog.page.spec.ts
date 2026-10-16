@@ -247,3 +247,78 @@ describe('CatalogPage', () => {
     expect(byTestId(fixture, 'range')?.textContent).toContain('1–1 sur 1');
   });
 });
+
+describe('CatalogPage — inversion majeur/mineur', () => {
+  let http: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [CatalogPage],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: Router, useValue: { navigate: vi.fn().mockResolvedValue(true) } },
+        {
+          provide: ActivatedRoute,
+          useValue: { snapshot: { queryParamMap: convertToParamMap({}) } },
+        },
+      ],
+    });
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => http.verify());
+
+  /** Affiche la page avec un morceau analysé (6A) et un sans tonalité. */
+  async function render(): Promise<ComponentFixture<CatalogPage>> {
+    const fixture = TestBed.createComponent(CatalogPage);
+    fixture.detectChanges();
+    http.expectOne((req) => req.url === '/api/tracks').flush({ total: 2, items: [ALPHA, PENDING] });
+    await fixture.whenStable();
+    return fixture;
+  }
+
+  /** Ligne du tableau à cette position. */
+  function row(fixture: ComponentFixture<CatalogPage>, index: number): HTMLElement {
+    return (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
+      '[data-testid="track-row"]',
+    )[index];
+  }
+
+  it('met la ligne à jour avec la tonalité corrigée', async () => {
+    const fixture = await render();
+    const button = row(fixture, 0).querySelector<HTMLButtonElement>('[data-testid="flip-mode"]')!;
+
+    button.click();
+    fixture.detectChanges();
+    expect(button.disabled).toBe(true);
+    const req = http.expectOne('/api/tracks/a/key/flip-mode');
+    expect(req.request.method).toBe('POST');
+    req.flush({ camelot: '9B', key_source: 'manual' });
+    await fixture.whenStable();
+
+    expect(row(fixture, 0).querySelector('[data-testid="camelot"]')?.textContent).toBe('9B');
+    expect(row(fixture, 0).querySelector('[data-testid="corrected"]')).not.toBeNull();
+    expect(button.disabled).toBe(false);
+  });
+
+  it("n'est pas proposée sans tonalité", async () => {
+    const fixture = await render();
+    const button = row(fixture, 1).querySelector<HTMLButtonElement>('[data-testid="flip-mode"]');
+    expect(button?.disabled).toBe(true);
+  });
+
+  it("affiche l'erreur de l'API", async () => {
+    const fixture = await render();
+    row(fixture, 0).querySelector<HTMLButtonElement>('[data-testid="flip-mode"]')!.click();
+    http
+      .expectOne('/api/tracks/a/key/flip-mode')
+      .flush({ detail: "Ce morceau n'a pas encore de tonalité" }, { status: 409, statusText: '' });
+    await fixture.whenStable();
+
+    const error = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="correction-error"]',
+    );
+    expect(error?.textContent).toContain('pas encore de tonalité');
+  });
+});

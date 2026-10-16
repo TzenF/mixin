@@ -7,10 +7,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
+from app.adapters.db import Database
 from app.adapters.queue import TaskQueue
 from app.adapters.track_repository import CatalogFilters, CatalogSort, TrackRepository
-from app.api.deps import get_current_user_id, get_queue, get_track_repository
+from app.api.deps import get_current_user_id, get_db, get_queue, get_track_repository
 from app.domain.camelot import CamelotKey
+from app.services.key_correction import NoKeyToFlipError, flip_mode
 
 router = APIRouter(prefix="/tracks", tags=["tracks"])
 
@@ -126,3 +128,26 @@ async def request_analysis(
     """Demande l'analyse audio d'un morceau ; elle sera faite par le worker."""
     await _ensure_exists(tracks, track_id)
     return AnalysisRequested(job_id=await queue.enqueue_analysis(str(track_id)))
+
+
+class KeyCorrected(BaseModel):
+    """Tonalité affichée après correction ; elle vient désormais de la correction perso."""
+
+    camelot: str
+    key_source: Literal["manual"] = "manual"
+
+
+@router.post("/{track_id}/key/flip-mode")
+async def flip_key_mode(
+    track_id: UUID,
+    tracks: Tracks,
+    user_id: CurrentUser,
+    db: Annotated[Database, Depends(get_db)],
+) -> KeyCorrected:
+    """Inverse majeur/mineur de la tonalité affichée (8A -> 11B), pour moi seulement ; 409 sans tonalité."""
+    await _ensure_exists(tracks, track_id)
+    try:
+        key = await flip_mode(db, user_id, track_id)
+    except NoKeyToFlipError as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e)) from e
+    return KeyCorrected(camelot=str(key))

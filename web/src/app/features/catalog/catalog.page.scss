@@ -97,9 +97,24 @@ th {
   margin-top: t.$space-4;
 }
 
+.key {
+  white-space: nowrap;
+}
+
+.corrected {
+  @include m.text-muted;
+  margin-left: t.$space-1;
+}
+
 button,
 .button {
   @include m.button-primary;
+}
+
+button.flip {
+  @include m.button-secondary;
+  margin-left: t.$space-2;
+  padding: 0 t.$space-2;
 }
 
 button.secondary {

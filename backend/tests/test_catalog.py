@@ -149,3 +149,45 @@ def test_invalid_parameters(logged_in_client: TestClient) -> None:
 
 def test_catalog_requires_a_session(client: TestClient) -> None:
     assert client.get("/tracks").status_code == 401
+
+
+def _row(client: TestClient, prefix: str, title: str) -> dict[str, Any]:
+    """Ligne du catalogue pour ce morceau de test."""
+    items = _get(client, f"{prefix} {title}", scope="all")["items"]
+    assert len(items) == 1
+    return items[0]
+
+
+def test_flip_mode_keeps_the_tonic_and_is_reversible(logged_in_client: TestClient, catalog: str) -> None:
+    alpha = _row(logged_in_client, catalog, "Alpha")
+    url = f"/tracks/{alpha['id']}/key/flip-mode"
+
+    flipped = logged_in_client.post(url)
+    assert flipped.status_code == 200
+    assert flipped.json() == {"camelot": "9B", "key_source": "manual"}  # 6A (sol mineur) -> 9B (sol majeur)
+    row = _row(logged_in_client, catalog, "Alpha")
+    assert (row["camelot"], row["key_source"], row["bpm"]) == ("9B", "manual", 124.0)  # BPM inchangé
+
+    assert logged_in_client.post(url).json()["camelot"] == "6A"
+
+
+def test_flip_mode_never_touches_essentia_or_other_users(
+    logged_in_client: TestClient, catalog: str, user_id: uuid.UUID
+) -> None:
+    beta = _row(logged_in_client, catalog, "Beta")  # 8B : déjà corrigé une fois par l'utilisateur
+    assert logged_in_client.post(f"/tracks/{beta['id']}/key/flip-mode").json()["camelot"] == "5A"
+
+    with psycopg.connect(get_settings().database_url) as conn:
+        rows = conn.execute(
+            """SELECT source::text, user_id, camelot_num || camelot_letter
+               FROM track_analysis WHERE track_id = %s ORDER BY 1""",
+            (beta["id"],),
+        ).fetchall()
+    # Une seule correction (mise à jour, pas ajoutée), personnelle ; la valeur Essentia reste 8A
+    assert rows == [("essentia", None, "8A"), ("manual", user_id, "5A")]
+
+
+def test_flip_mode_errors(logged_in_client: TestClient, client: TestClient, catalog: str) -> None:
+    delta = _row(logged_in_client, catalog, "Delta_x")
+    assert logged_in_client.post(f"/tracks/{delta['id']}/key/flip-mode").status_code == 409
+    assert logged_in_client.post(f"/tracks/{uuid.uuid4()}/key/flip-mode").status_code == 404

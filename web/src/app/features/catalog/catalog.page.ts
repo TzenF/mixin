@@ -11,6 +11,7 @@ import {
   CatalogQuery,
   CatalogService,
   CatalogSort,
+  CatalogTrack,
 } from '../../core/api/catalog.service';
 
 const PAGE_SIZE = 50;
@@ -51,6 +52,10 @@ export class CatalogPage {
   /** Filtres, tri et page en cours ; lus dans l'URL au chargement, recopiés dedans à chaque changement. */
   protected readonly query = signal<CatalogQuery>(queryFromUrl(this.route.snapshot.queryParamMap));
   protected readonly state = signal<State>({ kind: 'loading' });
+  /** Morceau dont la tonalité est en cours d'inversion, ou null. */
+  protected readonly flipping = signal<string | null>(null);
+  /** Échec de la dernière correction de tonalité, ou null. */
+  protected readonly correctionError = signal<string | null>(null);
 
   private request: Subscription | undefined;
   private searchTimer: ReturnType<typeof setTimeout> | undefined;
@@ -158,6 +163,26 @@ export class CatalogPage {
     this.goTo(this.query().offset + PAGE_SIZE);
   }
 
+  /** Inverse majeur/mineur de la tonalité du morceau (correction perso), puis met sa ligne à jour. */
+  protected flipMode(track: CatalogTrack): void {
+    this.flipping.set(track.id);
+    this.correctionError.set(null);
+    this.catalog.flipMode(track.id).subscribe({
+      next: ({ camelot, key_source }) => {
+        this.flipping.set(null);
+        this.updateTrack(track.id, { camelot, key_source, key_confidence: 1 });
+      },
+      error: (err: HttpErrorResponse) => {
+        this.flipping.set(null);
+        if (err.status === 401) {
+          this.state.set({ kind: 'disconnected' });
+        } else {
+          this.correctionError.set(apiErrorMessage(err, 'La correction a échoué.'));
+        }
+      },
+    });
+  }
+
   /** Valeur d'un champ de formulaire à partir de son événement. */
   protected valueOf(event: Event): string {
     return (event.target as HTMLInputElement | HTMLSelectElement).value;
@@ -166,6 +191,21 @@ export class CatalogPage {
   /** État d'une case à cocher à partir de son événement. */
   protected checkedOf(event: Event): boolean {
     return (event.target as HTMLInputElement).checked;
+  }
+
+  /** Met à jour un morceau de la page affichée, sans la recharger. */
+  private updateTrack(trackId: string, change: Partial<CatalogTrack>): void {
+    this.state.update((s) =>
+      s.kind === 'ready'
+        ? {
+            ...s,
+            page: {
+              ...s.page,
+              items: s.page.items.map((t) => (t.id === trackId ? { ...t, ...change } : t)),
+            },
+          }
+        : s,
+    );
   }
 
   /** Applique un changement de filtre : retour à la première page. */

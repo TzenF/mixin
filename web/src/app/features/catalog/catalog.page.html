@@ -96,6 +96,9 @@
   }
 
   @if (page(); as page) {
+    @if (correctionError(); as message) {
+      <p class="error" data-testid="correction-error">{{ message }}</p>
+    }
     @if (range(); as r) {
       <p class="hint" data-testid="range">{{ r.from }}–{{ r.to }} sur {{ r.total }}</p>
       <table data-testid="tracks">
@@ -116,7 +119,25 @@
               <td class="number" data-testid="bpm">
                 {{ track.bpm === null ? '—' : (track.bpm | number: '1.1-1') }}
               </td>
-              <td data-testid="camelot">{{ track.camelot ?? '—' }}</td>
+              <td class="key">
+                <span data-testid="camelot">{{ track.camelot ?? '—' }}</span>
+                @if (track.key_source === 'manual') {
+                  <span class="corrected" data-testid="corrected" title="Corrigée par toi"
+                    >corrigée</span
+                  >
+                }
+                <button
+                  type="button"
+                  class="flip"
+                  title="Inverser majeur/mineur (même tonique)"
+                  aria-label="Inverser majeur/mineur"
+                  [disabled]="track.camelot === null || flipping() === track.id"
+                  (click)="flipMode(track)"
+                  data-testid="flip-mode"
+                >
+                  ⇄
+                </button>
+              </td>
               <td>
                 <span [class]="'badge ' + track.analysis_status" data-testid="status-badge">
                   {{ statusLabels[track.analysis_status] }}
