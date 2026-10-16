@@ -182,6 +182,21 @@ vide**. Nouveau fichier numéroté, puis `make reset-db` en dev.
   fichiers modifiés.
 - Changer `TOKEN_ENCRYPTION_KEY` rend les jetons stockés illisibles : il faut se reconnecter à Spotify.
 - Le worker exécute peu de tâches en parallèle (`max_jobs = 2`) : Essentia est gourmand en CPU.
+- **Worker et code monté** : l'image installe `app` dans `site-packages` (`pip install .`). Le worker tourne
+  avec `PYTHONPATH=/app` (code monté prioritaire) et `watchfiles` (relance le processus). Ne pas revenir à
+  `arq --watch` : il redémarre sans réimporter le code, les modifications ne sont jamais prises en compte.
+- **arq dédoublonne aussi sur le résultat gardé** : avec un `_job_id` fixe, une tâche terminée bloque une
+  nouvelle mise en file tant que son résultat existe. D'où `keep_result = 0` ; le statut est dans
+  `track.analysis_status`.
+- **Les tests utilisent la base Redis 15** (forcée dans `tests/conftest.py`) : le worker de dev, sur la
+  base 0, n'exécute pas leurs tâches.
+- Postgres et Redis ne sont publiés que sur `127.0.0.1` (mots de passe de dev, Redis sans authentification).
+
+## Mise en ligne (pas encore faite : à revoir le jour d'un déploiement)
+
+Réglages de dev à changer : `SESSION_COOKIE_SECURE=true` (HTTPS), vrais mots de passe Postgres et Redis,
+`/docs` désactivé, conteneurs non-root, pas de `--reload` ni de `watchfiles`, aucun port de base ou de
+Redis publié.
 
 ## Analyse audio (résultats des spikes, voir spikes/README.md)
 
