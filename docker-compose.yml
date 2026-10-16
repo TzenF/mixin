@@ -45,6 +45,7 @@ services:
       SPOTIFY_REDIRECT_URI: ${SPOTIFY_REDIRECT_URI:-http://127.0.0.1:4200/api/auth/spotify/callback}
       TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
     volumes:
       - ./backend/app:/app/app
       - ./backend/tests:/app/tests

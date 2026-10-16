@@ -35,7 +35,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await app.state.queue.close()
             await app.state.db.close()
 
-    app = FastAPI(title="DJ Platform API", version="0.1.0", lifespan=lifespan)
+    # En production, pas de documentation interactive : elle décrit toute l'API à n'importe qui.
+    docs = {} if not settings.is_production else {"docs_url": None, "redoc_url": None, "openapi_url": None}
+    app = FastAPI(title="DJ Platform API", version="0.1.0", lifespan=lifespan, **docs)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
