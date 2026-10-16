@@ -25,6 +25,7 @@ class CatalogFilters:
     sort: CatalogSort = "title"
     limit: int = 50
     offset: int = 0
+    track_id: UUID | None = None  # un seul morceau (fiche d'un morceau)
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +57,7 @@ class SuggestionRow:
 
     track_id: UUID
     title: str
+    artists: list[str]
     bpm: float
     camelot: str
     key_move: str
@@ -64,22 +66,34 @@ class SuggestionRow:
     score: float
 
 
-_SUGGEST_SQL = """
-SELECT s.track_id, t.title, s.bpm::float AS bpm, s.camelot, s.key_move, s.half_double,
-       s.bpm_diff::float AS bpm_diff_pct, s.score::float AS score
-FROM suggest_tracks(%(user_id)s::uuid, %(seed)s::uuid, %(tolerance)s::numeric, %(limit)s::integer) s
+# Artistes du morceau `t`, dans l'ordre d'affichage.
+_ARTISTS_SQL = """COALESCE((SELECT array_agg(a.name ORDER BY ta.position)
+                 FROM track_artist ta JOIN artist a ON a.id = ta.artist_id
+                 WHERE ta.track_id = t.id), '{}')"""
+
+# « Mes morceaux » = ceux des playlists de l'utilisateur ; sans effet si only_mine est faux.
+_MINE_SQL = """(NOT %(only_mine)s OR EXISTS (
+          SELECT 1 FROM playlist_item pi JOIN playlist p ON p.id = pi.playlist_id
+          WHERE pi.track_id = t.id AND p.owner_id = %(user_id)s::uuid))"""
+
+# suggest_tracks est appelée sans limite (NULL) : le filtre « mes morceaux » s'applique avant la limite.
+_SUGGEST_SQL = f"""
+SELECT s.track_id, t.title, {_ARTISTS_SQL} AS artists, s.bpm::float AS bpm, s.camelot, s.key_move,
+       s.half_double, s.bpm_diff::float AS bpm_diff_pct, s.score::float AS score
+FROM suggest_tracks(%(user_id)s::uuid, %(seed)s::uuid, %(tolerance)s::numeric, NULL::integer) s
 JOIN track t ON t.id = s.track_id
-ORDER BY s.score DESC
+WHERE {_MINE_SQL}
+ORDER BY s.score DESC, lower(t.title), t.id
+LIMIT %(limit)s
 """
 
 
-# Morceaux filtrés, avec leurs valeurs affichées. « Mes morceaux » = ceux de mes playlists.
-_CATALOG_FROM = """
+# Morceaux filtrés, avec leurs valeurs affichées.
+_CATALOG_FROM = f"""
 FROM track t
 LEFT JOIN effective_features(%(user_id)s::uuid) f ON f.track_id = t.id
-WHERE (NOT %(only_mine)s OR EXISTS (
-          SELECT 1 FROM playlist_item pi JOIN playlist p ON p.id = pi.playlist_id
-          WHERE pi.track_id = t.id AND p.owner_id = %(user_id)s::uuid))
+WHERE {_MINE_SQL}
+  AND (%(track_id)s::uuid IS NULL OR t.id = %(track_id)s::uuid)
   AND (%(text)s::text IS NULL OR t.title ILIKE %(text)s OR EXISTS (
           SELECT 1 FROM track_artist ta JOIN artist a ON a.id = ta.artist_id
           WHERE ta.track_id = t.id AND a.name ILIKE %(text)s))
@@ -90,11 +104,8 @@ WHERE (NOT %(only_mine)s OR EXISTS (
   AND (%(status)s::analysis_status IS NULL OR t.analysis_status = %(status)s::analysis_status)
 """
 
-_CATALOG_SELECT = """
-SELECT t.id, t.title,
-       COALESCE((SELECT array_agg(a.name ORDER BY ta.position)
-                 FROM track_artist ta JOIN artist a ON a.id = ta.artist_id
-                 WHERE ta.track_id = t.id), '{}') AS artists,
+_CATALOG_SELECT = f"""
+SELECT t.id, t.title, {_ARTISTS_SQL} AS artists,
        f.bpm::float AS bpm,
        f.camelot_num || f.camelot_letter AS camelot,
        f.bpm_source::text AS bpm_source, f.key_source::text AS key_source,
@@ -158,6 +169,7 @@ class TrackRepository:
             "status": filters.status,
             "limit": filters.limit,
             "offset": filters.offset,
+            "track_id": filters.track_id,
         }
         # Deux requêtes : le total reste juste même quand la page demandée est vide.
         total = await self._db.fetch_one(f"SELECT count(*) AS n {_CATALOG_FROM}", params)
@@ -170,11 +182,18 @@ class TrackRepository:
         return CatalogPage(total=total["n"], items=[CatalogRow(**r) for r in rows])
 
     async def suggestions(
-        self, seed: UUID, user_id: UUID | None, bpm_tolerance: float, limit: int
+        self, seed: UUID, user_id: UUID, bpm_tolerance: float, limit: int, only_mine: bool = True
     ) -> list[SuggestionRow]:
         """Morceaux compatibles avec `seed`, du meilleur score au moins bon (voir suggest_tracks en SQL)."""
         rows = await self._db.fetch_all(
-            _SUGGEST_SQL, {"user_id": user_id, "seed": seed, "tolerance": bpm_tolerance, "limit": limit}
+            _SUGGEST_SQL,
+            {
+                "user_id": user_id,
+                "seed": seed,
+                "tolerance": bpm_tolerance,
+                "limit": limit,
+                "only_mine": only_mine,
+            },
         )
         return [SuggestionRow(**r) for r in rows]
 

@@ -1,0 +1,213 @@
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ActivatedRoute, ParamMap, Router, convertToParamMap } from '@angular/router';
+import { BehaviorSubject } from 'rxjs';
+import { CatalogTrack, Suggestion } from '../../core/api/catalog.service';
+import { SuggestionsPage } from './suggestions.page';
+
+const SEED: CatalogTrack = {
+  id: 'seed',
+  title: 'Losing It',
+  artists: ['FISHER'],
+  bpm: 124,
+  camelot: '6A',
+  bpm_source: 'essentia',
+  key_source: 'essentia',
+  key_confidence: 0.6,
+  analysis_status: 'done',
+};
+const ROCK: Suggestion = {
+  track_id: 'rock',
+  title: 'Rock That Body',
+  artists: ['Black Eyed Peas'],
+  bpm: 125,
+  camelot: '7A',
+  key_move: 'adjacent',
+  half_double: false,
+  bpm_diff_pct: 0.8,
+  score: 0.777,
+};
+const DOUBLE: Suggestion = {
+  ...ROCK,
+  track_id: 'double',
+  title: 'Double',
+  key_move: 'same',
+  half_double: true,
+};
+
+describe('SuggestionsPage', () => {
+  let http: HttpTestingController;
+  let navigate: ReturnType<typeof vi.fn>;
+  let params: BehaviorSubject<ParamMap>;
+
+  /** Configure le module de test ; `query` simule les paramètres de l'URL. */
+  function setup(query: Record<string, string> = {}): void {
+    navigate = vi.fn().mockResolvedValue(true);
+    params = new BehaviorSubject(convertToParamMap({ trackId: 'seed' }));
+    TestBed.configureTestingModule({
+      imports: [SuggestionsPage],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: Router, useValue: { navigate } },
+        {
+          provide: ActivatedRoute,
+          useValue: { paramMap: params, snapshot: { queryParamMap: convertToParamMap(query) } },
+        },
+      ],
+    });
+    http = TestBed.inject(HttpTestingController);
+  }
+
+  /** Répond aux deux requêtes d'un chargement (morceau de départ, puis suggestions). */
+  async function answer(
+    fixture: ComponentFixture<SuggestionsPage>,
+    seed: CatalogTrack = SEED,
+    suggestions: Suggestion[] = [ROCK, DOUBLE],
+    id = 'seed',
+  ): Promise<void> {
+    http.expectOne(`/api/tracks/${id}`).flush(seed);
+    http.expectOne((req) => req.url === `/api/tracks/${id}/suggestions`).flush(suggestions);
+    await fixture.whenStable();
+  }
+
+  /** Affiche la page (sans répondre aux requêtes). */
+  function create(): ComponentFixture<SuggestionsPage> {
+    const fixture = TestBed.createComponent(SuggestionsPage);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  /** Raccourci : élément portant ce data-testid. */
+  function byTestId<T extends HTMLElement = HTMLElement>(
+    fixture: ComponentFixture<SuggestionsPage>,
+    id: string,
+  ): T | null {
+    return (fixture.nativeElement as HTMLElement).querySelector<T>(`[data-testid="${id}"]`);
+  }
+
+  /** Paramètres de la requête de suggestions en attente. */
+  function suggestionParams(id = 'seed'): Record<string, string | null> {
+    const req = http.expectOne((r) => r.url === `/api/tracks/${id}/suggestions`);
+    const p = req.request.params;
+    const result = { scope: p.get('scope'), bpm_tolerance: p.get('bpm_tolerance') };
+    req.flush([]);
+    return result;
+  }
+
+  afterEach(() => http.verify());
+
+  it('affiche le morceau de départ et les suggestions', async () => {
+    setup();
+    const fixture = create();
+    await answer(fixture);
+
+    expect(byTestId(fixture, 'seed')?.textContent).toContain('Losing It');
+    expect(byTestId(fixture, 'seed-camelot')?.textContent).toBe('6A');
+    const items = (fixture.nativeElement as HTMLElement).querySelectorAll(
+      '[data-testid="suggestion"]',
+    );
+    expect(items.length).toBe(2);
+    expect(items[0].textContent).toContain('Rock That Body');
+    expect(items[0].textContent).toContain('Black Eyed Peas');
+    expect(items[0].textContent).toContain('Tonalité voisine');
+    expect(items[0].querySelector('[data-testid="half-double"]')).toBeNull();
+    expect(items[1].querySelector('[data-testid="half-double"]')).not.toBeNull();
+  });
+
+  it('demande mes morceaux avec ±6 % par défaut, ou les réglages de l’URL', async () => {
+    setup();
+    create();
+    http.expectOne('/api/tracks/seed').flush(SEED);
+    expect(suggestionParams()).toEqual({ scope: 'mine', bpm_tolerance: '0.06' });
+  });
+
+  it("reprend les réglages présents dans l'URL", async () => {
+    setup({ scope: 'all', tolerance: '0.1' });
+    const fixture = create();
+    http.expectOne('/api/tracks/seed').flush(SEED);
+    expect(suggestionParams()).toEqual({ scope: 'all', bpm_tolerance: '0.1' });
+    await fixture.whenStable();
+    expect(byTestId<HTMLInputElement>(fixture, 'show-all')?.checked).toBe(true);
+  });
+
+  it('enchaîne : la suggestion choisie devient le point de départ', async () => {
+    setup();
+    const fixture = create();
+    await answer(fixture);
+
+    byTestId(fixture, 'suggestion')!.click();
+    expect(navigate).toHaveBeenCalledWith(['/suggestions', 'rock'], {
+      queryParamsHandling: 'preserve',
+    });
+
+    params.next(convertToParamMap({ trackId: 'rock' }));
+    await answer(fixture, { ...SEED, id: 'rock', title: 'Rock That Body' }, [], 'rock');
+    expect(byTestId(fixture, 'seed')?.textContent).toContain('Rock That Body');
+  });
+
+  it("change l'écart de BPM et l'inscrit dans l'URL", async () => {
+    setup();
+    const fixture = create();
+    await answer(fixture);
+
+    const select = byTestId<HTMLSelectElement>(fixture, 'tolerance')!;
+    select.value = '0.1';
+    select.dispatchEvent(new Event('change'));
+
+    http.expectOne('/api/tracks/seed').flush(SEED);
+    expect(suggestionParams()).toEqual({ scope: 'mine', bpm_tolerance: '0.1' });
+    expect(navigate).toHaveBeenLastCalledWith(
+      [],
+      expect.objectContaining({ queryParams: { scope: null, tolerance: 0.1 }, replaceUrl: true }),
+    );
+  });
+
+  it('explique pourquoi il n’y a pas de suggestion', async () => {
+    setup();
+    const notAnalysed = create();
+    await answer(notAnalysed, { ...SEED, bpm: null, camelot: null }, []);
+    expect(byTestId(notAnalysed, 'not-analysed')).not.toBeNull();
+    expect(byTestId<HTMLButtonElement>(notAnalysed, 'flip-mode')?.disabled).toBe(true);
+  });
+
+  it('signale quand aucun morceau n’est compatible', async () => {
+    setup();
+    const fixture = create();
+    await answer(fixture, SEED, []);
+    expect(byTestId(fixture, 'empty')).not.toBeNull();
+  });
+
+  it('inverse majeur/mineur du morceau de départ puis recalcule', async () => {
+    setup();
+    const fixture = create();
+    await answer(fixture);
+
+    byTestId(fixture, 'flip-mode')!.click();
+    http.expectOne('/api/tracks/seed/key/flip-mode').flush({ camelot: '9B', key_source: 'manual' });
+    await answer(fixture, { ...SEED, camelot: '9B', key_source: 'manual' }, []);
+
+    expect(byTestId(fixture, 'seed-camelot')?.textContent).toBe('9B');
+    expect(byTestId(fixture, 'seed')?.textContent).toContain('corrigée');
+  });
+
+  it('gère un morceau inconnu et une session absente', async () => {
+    setup();
+    const fixture = create();
+    http
+      .expectOne('/api/tracks/seed')
+      .flush({ detail: 'Morceau inconnu' }, { status: 404, statusText: '' });
+    http.expectOne((r) => r.url === '/api/tracks/seed/suggestions');
+    await fixture.whenStable();
+    expect(byTestId(fixture, 'not-found')).not.toBeNull();
+
+    params.next(convertToParamMap({ trackId: 'other' }));
+    http
+      .expectOne('/api/tracks/other')
+      .flush({ detail: 'Non connecté' }, { status: 401, statusText: '' });
+    http.expectOne((r) => r.url === '/api/tracks/other/suggestions');
+    await fixture.whenStable();
+    expect(byTestId(fixture, 'connect-spotify')).not.toBeNull();
+  });
+});

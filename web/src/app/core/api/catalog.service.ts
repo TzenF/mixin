@@ -27,6 +27,30 @@ export interface CatalogPage {
   items: CatalogTrack[];
 }
 
+/** Type d'enchaînement de tonalité (roue Camelot). */
+export type KeyMove = 'same' | 'adjacent' | 'relative' | 'energy_shift';
+
+/** Un morceau qui s'enchaîne bien après le morceau de départ (voir backend/app/api/tracks.py). */
+export interface Suggestion {
+  track_id: string;
+  title: string;
+  artists: string[];
+  bpm: number;
+  camelot: string;
+  key_move: KeyMove;
+  /** Vrai si l'enchaînement passe par un demi- ou double tempo. */
+  half_double: boolean;
+  bpm_diff_pct: number;
+  score: number;
+}
+
+/** Réglages des suggestions. */
+export interface SuggestionOptions {
+  scope: 'mine' | 'all';
+  /** Écart de BPM accepté, en fraction (0.06 = ±6 %). */
+  bpmTolerance: number;
+}
+
 /** Tonalité affichée après une correction perso. */
 export interface KeyCorrected {
   camelot: string;
@@ -79,5 +103,20 @@ export class CatalogService {
       `/api/tracks/${encodeURIComponent(trackId)}/key/flip-mode`,
       null,
     );
+  }
+
+  /** Un morceau et ses valeurs affichées ; 404 s'il n'existe pas. */
+  track(trackId: string): Observable<CatalogTrack> {
+    return this.http.get<CatalogTrack>(`/api/tracks/${encodeURIComponent(trackId)}`);
+  }
+
+  /** Morceaux qui s'enchaînent bien après ce morceau, du meilleur au moins bon. */
+  suggestions(trackId: string, options: SuggestionOptions): Observable<Suggestion[]> {
+    const params = new HttpParams()
+      .set('scope', options.scope)
+      .set('bpm_tolerance', options.bpmTolerance);
+    return this.http.get<Suggestion[]>(`/api/tracks/${encodeURIComponent(trackId)}/suggestions`, {
+      params,
+    });
   }
 }

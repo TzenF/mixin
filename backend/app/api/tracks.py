@@ -83,6 +83,7 @@ class Suggestion(BaseModel):
 
     track_id: UUID
     title: str
+    artists: list[str]
     bpm: float
     camelot: str
     key_move: str
@@ -102,14 +103,26 @@ async def suggestions(
     track_id: UUID,
     tracks: Tracks,
     user_id: CurrentUser,
+    scope: Literal["mine", "all"] = "mine",
     bpm_tolerance: Annotated[float, Query(gt=0, le=0.2)] = 0.06,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> list[Suggestion]:
-    """Liste les morceaux qui s'enchaînent bien après `track_id`, du meilleur au moins bon."""
+    """Liste les morceaux (les miens, ou tous avec scope=all) qui s'enchaînent bien après `track_id`."""
     await _ensure_exists(tracks, track_id)
     # Avec l'utilisateur : ses valeurs rekordbox et ses corrections passent avant Essentia.
-    rows = await tracks.suggestions(track_id, user_id=user_id, bpm_tolerance=bpm_tolerance, limit=limit)
+    rows = await tracks.suggestions(
+        track_id, user_id=user_id, bpm_tolerance=bpm_tolerance, limit=limit, only_mine=scope == "mine"
+    )
     return [Suggestion(**asdict(r)) for r in rows]
+
+
+@router.get("/{track_id}")
+async def get_track(track_id: UUID, tracks: Tracks, user_id: CurrentUser) -> CatalogTrack:
+    """Un morceau et ses valeurs affichées, même hors de mes playlists ; 404 s'il n'existe pas."""
+    page = await tracks.catalog(user_id, CatalogFilters(only_mine=False, track_id=track_id, limit=1))
+    if not page.items:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Morceau inconnu")
+    return CatalogTrack(**asdict(page.items[0]))
 
 
 class AnalysisRequested(BaseModel):

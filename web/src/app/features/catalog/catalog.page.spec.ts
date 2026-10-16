@@ -197,6 +197,16 @@ describe('CatalogPage', () => {
     expect(paramsOf(pending())['offset']).toBe('50');
   });
 
+  it('ouvre les suggestions d’un morceau en gardant « tous les morceaux »', async () => {
+    setup({ scope: 'all' });
+    const fixture = await render();
+
+    byTestId(fixture, 'open-suggestions')!.click();
+    expect(navigate).toHaveBeenLastCalledWith(['/suggestions', 'a'], {
+      queryParams: { scope: 'all' },
+    });
+  });
+
   it('signale quand aucun morceau ne correspond', async () => {
     setup();
     const fixture = await render({ total: 0, items: [] });

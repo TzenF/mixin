@@ -183,6 +183,12 @@ export class CatalogPage {
     });
   }
 
+  /** Ouvre les suggestions d'enchaînement après ce morceau (en gardant « tous les morceaux » si coché). */
+  protected openSuggestions(track: CatalogTrack): void {
+    const scope = this.query().scope === 'all' ? 'all' : null;
+    void this.router.navigate(['/suggestions', track.id], { queryParams: { scope } });
+  }
+
   /** Valeur d'un champ de formulaire à partir de son événement. */
   protected valueOf(event: Event): string {
     return (event.target as HTMLInputElement | HTMLSelectElement).value;

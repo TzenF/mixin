@@ -76,6 +76,51 @@
   color: var(--color-text);
 }
 
+/// Petit bouton d'action dans une ligne (ex. ⇄ inverser majeur/mineur).
+@mixin icon-button {
+  @include button-secondary;
+  margin-left: t.$space-2;
+  padding: 0 t.$space-2;
+}
+
+/// Champ de formulaire (input, select).
+@mixin field {
+  padding: t.$space-1 t.$space-2;
+  border: t.$border-width solid var(--color-border);
+  border-radius: t.$radius-sm;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+  @include focus-ring;
+}
+
+/// Barre de filtres : libellés au-dessus de leur champ, `.toggle` pour une case à cocher sur une ligne.
+@mixin filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: t.$space-3;
+  margin-bottom: t.$space-6;
+  font-size: t.$font-size-sm;
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: t.$space-1;
+  }
+
+  .toggle {
+    flex-direction: row;
+    align-items: center;
+    gap: t.$space-2;
+  }
+
+  input:not([type='checkbox']),
+  select {
+    @include field;
+  }
+}
+
 /// Texte secondaire, moins contrasté.
 @mixin text-muted {
   color: var(--color-text-muted);

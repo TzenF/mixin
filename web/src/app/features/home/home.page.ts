@@ -12,7 +12,7 @@ const LINKS: HomeLink[] = [
   {
     path: '/catalog',
     label: 'Catalogue',
-    description: 'Mes morceaux avec BPM et tonalité, filtrables',
+    description: 'Mes morceaux avec BPM et tonalité ; bouton « Suggestions » pour enchaîner',
   },
   {
     path: '/spotify',

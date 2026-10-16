@@ -109,6 +109,7 @@
             <th scope="col" class="number">BPM</th>
             <th scope="col">Tonalité</th>
             <th scope="col">Analyse</th>
+            <th scope="col" aria-label="Actions"></th>
           </tr>
         </thead>
         <tbody>
@@ -142,6 +143,16 @@
                 <span [class]="'badge ' + track.analysis_status" data-testid="status-badge">
                   {{ statusLabels[track.analysis_status] }}
                 </span>
+              </td>
+              <td>
+                <button
+                  type="button"
+                  class="secondary"
+                  (click)="openSuggestions(track)"
+                  data-testid="open-suggestions"
+                >
+                  Suggestions
+                </button>
               </td>
             </tr>
           }

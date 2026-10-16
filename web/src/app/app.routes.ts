@@ -22,5 +22,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/catalog/catalog.page').then((m) => m.CatalogPage),
     title: 'Catalogue · DJ Platform',
   },
+  {
+    path: 'suggestions/:trackId',
+    loadComponent: () =>
+      import('./features/suggestions/suggestions.page').then((m) => m.SuggestionsPage),
+    title: 'Suggestions · DJ Platform',
+  },
   { path: '**', redirectTo: '' },
 ];

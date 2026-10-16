@@ -187,7 +187,42 @@ def test_flip_mode_never_touches_essentia_or_other_users(
     assert rows == [("essentia", None, "8A"), ("manual", user_id, "5A")]
 
 
-def test_flip_mode_errors(logged_in_client: TestClient, client: TestClient, catalog: str) -> None:
+def test_flip_mode_errors(logged_in_client: TestClient, catalog: str) -> None:
     delta = _row(logged_in_client, catalog, "Delta_x")
     assert logged_in_client.post(f"/tracks/{delta['id']}/key/flip-mode").status_code == 409
     assert logged_in_client.post(f"/tracks/{uuid.uuid4()}/key/flip-mode").status_code == 404
+
+
+def _suggested(client: TestClient, seed_id: str, prefix: str, **params: Any) -> list[dict[str, Any]]:
+    """Suggestions pour ce morceau, limitées aux morceaux du test (la base de dev en contient d'autres)."""
+    resp = client.get(f"/tracks/{seed_id}/suggestions", params={"limit": 100, **params})
+    assert resp.status_code == 200, resp.text
+    return [s for s in resp.json() if s["title"].startswith(prefix)]
+
+
+def test_suggestions_are_limited_to_my_tracks_unless_asked(
+    logged_in_client: TestClient, catalog: str
+) -> None:
+    alpha = _row(logged_in_client, catalog, "Alpha")  # 124 BPM, 6A
+    # Gamma (126 BPM, 6A) s'enchaîne bien, mais n'est dans aucune de mes playlists
+    assert _suggested(logged_in_client, alpha["id"], catalog) == []
+
+    everything = _suggested(logged_in_client, alpha["id"], catalog, scope="all")
+    assert [(s["title"].removeprefix(f"{catalog} "), s["key_move"]) for s in everything] == [
+        ("Gamma", "same")
+    ]
+
+
+def test_suggestions_include_artists(logged_in_client: TestClient, catalog: str) -> None:
+    gamma = _row(logged_in_client, catalog, "Gamma")
+    (alpha,) = _suggested(logged_in_client, gamma["id"], catalog)  # Alpha est à moi : visible sans scope=all
+    assert alpha["artists"] == [f"{catalog} Artiste"]
+
+
+def test_get_one_track(logged_in_client: TestClient, catalog: str) -> None:
+    gamma = _row(logged_in_client, catalog, "Gamma")  # hors de mes playlists : la fiche reste accessible
+
+    resp = logged_in_client.get(f"/tracks/{gamma['id']}")
+    assert resp.status_code == 200
+    assert resp.json() == gamma
+    assert logged_in_client.get(f"/tracks/{uuid.uuid4()}").status_code == 404

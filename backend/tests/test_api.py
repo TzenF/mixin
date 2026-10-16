@@ -17,11 +17,16 @@ def test_tracks_routes_require_a_session(client: TestClient, tracks: dict[str, u
     track_id = tracks["Where Have You Been"]
     assert client.get(f"/tracks/{track_id}/suggestions").status_code == 401
     assert client.post(f"/tracks/{track_id}/analysis").status_code == 401
+    assert client.get(f"/tracks/{track_id}").status_code == 401
+    assert client.post(f"/tracks/{track_id}/key/flip-mode").status_code == 401
 
 
 @requires_services
 def test_suggestions(logged_in_client: TestClient, tracks: dict[str, uuid.UUID]) -> None:
-    resp = logged_in_client.get(f"/tracks/{tracks['Where Have You Been']}/suggestions")
+    # scope=all : ces morceaux ne sont dans aucune playlist de l'utilisateur
+    resp = logged_in_client.get(
+        f"/tracks/{tracks['Where Have You Been']}/suggestions", params={"scope": "all"}
+    )
     assert resp.status_code == 200
     # La base de dev contient d'autres morceaux analysés : on ne regarde que ceux du test.
     mine = {str(t) for t in tracks.values()}

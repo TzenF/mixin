@@ -1,0 +1,82 @@
+@use 'mixins' as m;
+@use 'tokens' as t;
+
+main {
+  @include m.page(t.$width-narrow);
+}
+
+.hint {
+  @include m.text-muted;
+}
+
+.error {
+  @include m.text-danger;
+}
+
+.options {
+  @include m.filter-bar;
+}
+
+.seed {
+  @include m.panel;
+  margin-bottom: t.$space-6;
+  border: t.$border-width solid var(--color-border);
+
+  p {
+    margin: 0 0 t.$space-1;
+  }
+}
+
+.title {
+  font-weight: t.$font-weight-bold;
+}
+
+ol {
+  @include m.reset-list;
+}
+
+li {
+  margin-bottom: t.$space-2;
+}
+
+button.suggestion {
+  @include m.panel;
+  @include m.focus-ring;
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-1;
+  width: 100%;
+  border: t.$border-width solid var(--color-border);
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--color-primary);
+  }
+}
+
+.details {
+  font-size: t.$font-size-sm;
+}
+
+.badge {
+  @include m.status(success);
+  margin-left: t.$space-1;
+  padding: 0 t.$space-2;
+  border-radius: t.$radius-sm;
+}
+
+button,
+.button {
+  @include m.button-primary;
+}
+
+button.secondary {
+  @include m.button-secondary;
+}
+
+button.flip {
+  @include m.icon-button;
+}

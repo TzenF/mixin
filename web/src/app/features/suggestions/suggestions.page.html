@@ -1,0 +1,112 @@
+<main>
+  <p>
+    <button type="button" class="secondary" (click)="backToCatalog()" data-testid="back">
+      ← Catalogue
+    </button>
+  </p>
+  <h1>Suggestions</h1>
+
+  <form class="options" (submit)="$event.preventDefault()">
+    <label class="toggle">
+      <input
+        type="checkbox"
+        [checked]="options().scope === 'all'"
+        (change)="setShowAll(checkedOf($event))"
+        data-testid="show-all"
+      />
+      Tous les morceaux
+    </label>
+    <label>
+      Écart de BPM
+      <select (change)="setTolerance(valueOf($event))" data-testid="tolerance">
+        @for (tolerance of tolerances; track tolerance) {
+          <option [value]="tolerance" [selected]="options().bpmTolerance === tolerance">
+            ± {{ percent(tolerance) }} %
+          </option>
+        }
+      </select>
+    </label>
+  </form>
+
+  @switch (state().kind) {
+    @case ('loading') {
+      <p class="hint" data-testid="loading">Chargement…</p>
+    }
+    @case ('disconnected') {
+      <p class="hint">Connecte-toi avec Spotify pour voir les suggestions.</p>
+      <a class="button" [href]="loginUrl" data-testid="connect-spotify">Connecter Spotify</a>
+    }
+    @case ('not_found') {
+      <p class="error" data-testid="not-found">Ce morceau n'existe pas.</p>
+    }
+    @case ('error') {
+      <p class="error" data-testid="error">{{ errorMessage() }}</p>
+      <button type="button" (click)="load()">Réessayer</button>
+    }
+  }
+
+  @if (seed(); as seed) {
+    <section class="seed" data-testid="seed">
+      <p class="hint">Après</p>
+      <p class="title">{{ seed.title }}</p>
+      <p class="hint">{{ seed.artists.join(', ') }}</p>
+      <p>
+        <span data-testid="seed-bpm">{{
+          seed.bpm === null ? '—' : (seed.bpm | number: '1.1-1')
+        }}</span>
+        BPM ·
+        <span data-testid="seed-camelot">{{ seed.camelot ?? '—' }}</span>
+        @if (seed.key_source === 'manual') {
+          <span class="hint">(corrigée)</span>
+        }
+        <button
+          type="button"
+          class="flip"
+          title="Inverser majeur/mineur (même tonique)"
+          aria-label="Inverser majeur/mineur"
+          [disabled]="seed.camelot === null || flipping()"
+          (click)="flipSeedMode()"
+          data-testid="flip-mode"
+        >
+          ⇄
+        </button>
+      </p>
+    </section>
+
+    @if (seed.bpm === null || seed.camelot === null) {
+      <p class="hint" data-testid="not-analysed">
+        Ce morceau n'a pas encore de BPM ou de tonalité : pas de suggestion possible.
+      </p>
+    } @else if (suggestions(); as suggestions) {
+      @if (suggestions.length === 0) {
+        <p class="hint" data-testid="empty">
+          Aucun morceau compatible. Élargis l'écart de BPM ou affiche tous les morceaux.
+        </p>
+      } @else {
+        <ol data-testid="suggestions">
+          @for (s of suggestions; track s.track_id) {
+            <li>
+              <button
+                type="button"
+                class="suggestion"
+                (click)="chain(s)"
+                title="Enchaîner : voir les suggestions après ce morceau"
+                data-testid="suggestion"
+              >
+                <span class="title">{{ s.title }}</span>
+                <span class="hint">{{ s.artists.join(', ') }}</span>
+                <span class="details">
+                  {{ s.bpm | number: '1.1-1' }} BPM ({{ s.bpm_diff_pct | number: '1.1-1' }} %) ·
+                  {{ s.camelot }} · {{ moveLabels[s.key_move] }}
+                  @if (s.half_double) {
+                    <span class="badge" data-testid="half-double">½ / ×2 tempo</span>
+                  }
+                </span>
+              </button>
+            </li>
+          }
+        </ol>
+      }
+    }
+  }
+</main>
