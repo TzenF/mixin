@@ -84,6 +84,7 @@
           ⇄
         </button>
         <app-add-to-playlist [trackId]="seed.id" />
+        <app-track-correction [track]="seed" (corrected)="load()" />
       </p>
     </section>
 

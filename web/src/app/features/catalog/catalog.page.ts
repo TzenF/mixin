@@ -14,6 +14,7 @@ import {
   CatalogTrack,
 } from '../../core/api/catalog.service';
 import { AddToPlaylistComponent } from '../../shared/add-to-playlist/add-to-playlist.component';
+import { TrackCorrectionComponent } from '../../shared/track-correction/track-correction.component';
 import { FavoriteButtonComponent } from '../../shared/favorite-button/favorite-button.component';
 import { CurrentPlaylistBarComponent } from '../../shared/current-playlist-bar/current-playlist-bar.component';
 
@@ -44,6 +45,7 @@ type State =
     AddToPlaylistComponent,
     CurrentPlaylistBarComponent,
     FavoriteButtonComponent,
+    TrackCorrectionComponent,
   ],
   templateUrl: './catalog.page.html',
   styleUrl: './catalog.page.scss',
@@ -210,6 +212,11 @@ export class CatalogPage {
   /** État d'une case à cocher à partir de son événement. */
   protected checkedOf(event: Event): boolean {
     return (event.target as HTMLInputElement).checked;
+  }
+
+  /** Reprend les valeurs d'un morceau qui vient d'être corrigé. */
+  protected onCorrected(updated: CatalogTrack): void {
+    this.updateTrack(updated.id, updated);
   }
 
   /** Met à jour un morceau de la page affichée, sans la recharger. */

@@ -375,4 +375,19 @@ describe('PlaylistDetailPage', () => {
       expect.stringContaining('02. FISHER – Rock That Body\n'),
     );
   });
+
+  it('recalcule les enchaînements après une correction', async () => {
+    const fixture = await render((req) => req.flush(PLAYLIST));
+    all(fixture, 'correct')[2].click();
+    fixture.detectChanges();
+    const bpm = all(fixture, 'correction-bpm')[0] as HTMLInputElement;
+    bpm.value = '125';
+    all(fixture, 'correction-save')[0].click();
+    http
+      .expectOne('/api/tracks/t3/correction')
+      .flush({ ...TRACK, id: 't3', bpm: 125, bpm_source: 'manual' });
+
+    http.expectOne('/api/playlists/set').flush(PLAYLIST); // rechargement discret
+    expect(all(fixture, 'loading').length).toBe(0);
+  });
 });

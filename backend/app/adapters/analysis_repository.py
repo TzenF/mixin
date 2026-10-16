@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from uuid import UUID
 
 from app.adapters.db import Queryable
@@ -31,6 +32,25 @@ DO UPDATE SET camelot_num = EXCLUDED.camelot_num,
               camelot_letter = EXCLUDED.camelot_letter,
               created_at = now()
 """
+
+# Correction perso complète (BPM et tonalité), qui remplace la précédente.
+_SAVE_PERSONAL_CORRECTION_SQL = """
+INSERT INTO track_analysis (track_id, source, user_id, created_by, bpm, camelot_num, camelot_letter)
+VALUES (%(track_id)s, 'manual', %(user_id)s, %(user_id)s, %(bpm)s, %(num)s, %(letter)s)
+ON CONFLICT (track_id, source, COALESCE(user_id, '00000000-0000-0000-0000-000000000000'))
+DO UPDATE SET bpm = EXCLUDED.bpm,
+              camelot_num = EXCLUDED.camelot_num,
+              camelot_letter = EXCLUDED.camelot_letter,
+              created_at = now()
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class PersonalCorrection:
+    """Correction perso d'un morceau : None = ce champ n'est pas corrigé (la valeur d'Essentia s'applique)."""
+
+    bpm: float | None
+    key: CamelotKey | None
 
 
 class AnalysisRepository:
@@ -67,4 +87,41 @@ class AnalysisRepository:
         await self._db.fetch_one(
             _SAVE_PERSONAL_KEY_SQL,
             {"track_id": track_id, "user_id": user_id, "num": key.number, "letter": key.letter},
+        )
+
+    async def personal_correction(self, track_id: UUID, user_id: UUID) -> PersonalCorrection | None:
+        """Correction perso de l'utilisateur pour ce morceau, ou None s'il n'en a pas."""
+        row = await self._db.fetch_one(
+            """SELECT bpm::float AS bpm, camelot_num, camelot_letter FROM track_analysis
+               WHERE track_id = %(track_id)s AND source = 'manual' AND user_id = %(user_id)s""",
+            {"track_id": track_id, "user_id": user_id},
+        )
+        if row is None:
+            return None
+        key = (
+            CamelotKey(row["camelot_num"], row["camelot_letter"]) if row["camelot_num"] is not None else None
+        )
+        return PersonalCorrection(bpm=row["bpm"], key=key)
+
+    async def save_personal_correction(
+        self, track_id: UUID, user_id: UUID, correction: PersonalCorrection
+    ) -> None:
+        """Enregistre la correction perso (au moins un des deux champs) en remplaçant la précédente."""
+        await self._db.fetch_one(
+            _SAVE_PERSONAL_CORRECTION_SQL,
+            {
+                "track_id": track_id,
+                "user_id": user_id,
+                "bpm": correction.bpm,
+                "num": correction.key.number if correction.key else None,
+                "letter": correction.key.letter if correction.key else None,
+            },
+        )
+
+    async def delete_personal_correction(self, track_id: UUID, user_id: UUID) -> None:
+        """Supprime la correction perso : les autres sources (Essentia…) s'appliquent de nouveau."""
+        await self._db.fetch_one(
+            """DELETE FROM track_analysis
+               WHERE track_id = %(track_id)s AND source = 'manual' AND user_id = %(user_id)s""",
+            {"track_id": track_id, "user_id": user_id},
         )

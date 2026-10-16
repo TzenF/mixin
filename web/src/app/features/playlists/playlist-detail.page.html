@@ -188,6 +188,7 @@
                   Retirer
                 </button>
               }
+              <app-track-correction [track]="row.item.track" (corrected)="onCorrected()" />
             </div>
             @if (row.transition; as t) {
               <p [class]="'transition ' + t.kind" data-testid="transition">{{ t.text }}</p>

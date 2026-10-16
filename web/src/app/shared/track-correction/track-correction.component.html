@@ -1,0 +1,60 @@
+@if (open()) {
+  <form
+    class="correction"
+    novalidate
+    (submit)="$event.preventDefault(); save(bpm, key)"
+    data-testid="correction-form"
+  >
+    <label>
+      BPM
+      <input
+        #bpm
+        type="number"
+        step="0.1"
+        [min]="bpmMin"
+        [max]="bpmMax"
+        [value]="track().bpm ?? ''"
+        data-testid="correction-bpm"
+      />
+    </label>
+    <button type="button" class="secondary" (click)="scale(bpm, 2)" data-testid="double">×2</button>
+    <button type="button" class="secondary" (click)="scale(bpm, 0.5)" data-testid="half">÷2</button>
+    <label>
+      Tonalité
+      <input
+        #key
+        type="text"
+        size="5"
+        maxlength="10"
+        placeholder="8A, Am…"
+        [value]="track().camelot ?? ''"
+        data-testid="correction-key"
+      />
+    </label>
+    <button type="submit" [disabled]="saving()" data-testid="correction-save">Enregistrer</button>
+    <button type="button" class="secondary" (click)="open.set(false)">Fermer</button>
+    @if (track().bpm_source === 'manual') {
+      <button type="button" class="secondary" (click)="cancel('bpm')" data-testid="cancel-bpm">
+        Annuler ma correction du BPM
+      </button>
+    }
+    @if (track().key_source === 'manual') {
+      <button type="button" class="secondary" (click)="cancel('key')" data-testid="cancel-key">
+        Annuler ma correction de tonalité
+      </button>
+    }
+    @if (error(); as message) {
+      <span class="error" data-testid="correction-error">{{ message }}</span>
+    }
+  </form>
+} @else {
+  <button
+    type="button"
+    class="secondary"
+    (click)="open.set(true)"
+    title="Corriger le BPM ou la tonalité (pour toi seulement)"
+    data-testid="correct"
+  >
+    Corriger
+  </button>
+}

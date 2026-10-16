@@ -13,6 +13,7 @@ import {
   SuggestionOptions,
 } from '../../core/api/catalog.service';
 import { AddToPlaylistComponent } from '../../shared/add-to-playlist/add-to-playlist.component';
+import { TrackCorrectionComponent } from '../../shared/track-correction/track-correction.component';
 import { FavoriteButtonComponent } from '../../shared/favorite-button/favorite-button.component';
 import { CurrentPlaylistBarComponent } from '../../shared/current-playlist-bar/current-playlist-bar.component';
 import { KEY_MOVE_LABELS } from '../../shared/key-moves';
@@ -36,6 +37,7 @@ type State =
     AddToPlaylistComponent,
     CurrentPlaylistBarComponent,
     FavoriteButtonComponent,
+    TrackCorrectionComponent,
   ],
   templateUrl: './suggestions.page.html',
   styleUrl: './suggestions.page.scss',

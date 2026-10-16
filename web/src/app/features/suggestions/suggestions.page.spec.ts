@@ -209,6 +209,23 @@ describe('SuggestionsPage', () => {
     expect(root.querySelectorAll('.suggestion-row [data-testid="add-to-playlist"]').length).toBe(2);
   });
 
+  it('recalcule les suggestions après une correction du morceau de départ', async () => {
+    setup();
+    const fixture = create();
+    await answer(fixture);
+    const seed = byTestId(fixture, 'seed')!;
+    seed.querySelector<HTMLButtonElement>('[data-testid="correct"]')!.click();
+    fixture.detectChanges();
+    seed.querySelector<HTMLButtonElement>('[data-testid="double"]')!.click();
+    seed.querySelector<HTMLButtonElement>('[data-testid="correction-save"]')!.click();
+    http
+      .expectOne('/api/tracks/seed/correction')
+      .flush({ ...SEED, bpm: 248, bpm_source: 'manual' });
+
+    await answer(fixture, { ...SEED, bpm: 248, bpm_source: 'manual' }, []);
+    expect(byTestId(fixture, 'seed-bpm')?.textContent).toContain('248.0');
+  });
+
   it('signale quand aucun morceau n’est compatible', async () => {
     setup();
     const fixture = create();

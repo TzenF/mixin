@@ -242,6 +242,21 @@ describe('CatalogPage', () => {
     expect(byTestId(fixture, 'favorite')?.textContent?.trim()).toBe('★');
   });
 
+  it('met la ligne à jour après une correction, avec « corrigé » sur le BPM', async () => {
+    setup();
+    const fixture = await render();
+    byTestId(fixture, 'correct')!.click();
+    fixture.detectChanges();
+    byTestId(fixture, 'half')!.click();
+    byTestId(fixture, 'correction-save')!.click();
+    http.expectOne('/api/tracks/a/correction').flush({ ...ALPHA, bpm: 62, bpm_source: 'manual' });
+    await fixture.whenStable();
+
+    const row = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="track-row"]')!;
+    expect(row.querySelector('[data-testid="bpm"]')?.textContent).toContain('62.0');
+    expect(row.querySelector('[data-testid="bpm-corrected"]')).not.toBeNull();
+  });
+
   it('signale quand aucun morceau ne correspond', async () => {
     setup();
     const fixture = await render({ total: 0, items: [] });

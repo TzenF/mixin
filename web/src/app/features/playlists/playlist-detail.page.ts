@@ -20,6 +20,7 @@ import {
 } from '../../core/api/playlist.service';
 import { CurrentPlaylistService } from '../../core/current-playlist.service';
 import { FileDownloadService } from '../../core/file-download.service';
+import { TrackCorrectionComponent } from '../../shared/track-correction/track-correction.component';
 import { FavoriteButtonComponent } from '../../shared/favorite-button/favorite-button.component';
 import { describeTransition } from '../../shared/key-moves';
 import { PlaylistTextFormat, playlistFileName, playlistText } from '../../shared/playlist-text';
@@ -34,7 +35,15 @@ type State =
 /** Page « Playlist » : morceaux dans l'ordre et qualité de chaque enchaînement. */
 @Component({
   selector: 'app-playlist-detail-page',
-  imports: [DatePipe, DecimalPipe, CdkDropList, CdkDrag, CdkDragHandle, FavoriteButtonComponent],
+  imports: [
+    DatePipe,
+    DecimalPipe,
+    CdkDropList,
+    CdkDrag,
+    CdkDragHandle,
+    FavoriteButtonComponent,
+    TrackCorrectionComponent,
+  ],
   templateUrl: './playlist-detail.page.html',
   styleUrl: './playlist-detail.page.scss',
 })
@@ -94,6 +103,11 @@ export class PlaylistDetailPage {
   /** Charge la playlist ; 401 = pas connectée, 404 = pas à moi ou inexistante. */
   protected load(): void {
     this.state.set({ kind: 'loading' });
+    this.reload();
+  }
+
+  /** Après une correction de BPM ou de tonalité : enchaînements recalculés. */
+  protected onCorrected(): void {
     this.reload();
   }
 

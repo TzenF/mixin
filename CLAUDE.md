@@ -90,7 +90,7 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Savoir si on est en production | `Settings.is_production` (`ENVIRONMENT`) |
 | Extrait Deezer par ISRC | `app/adapters/deezer_client.py` → `DeezerClient` (`DeezerUnavailableError` = réessayer plus tard) |
 | Valeurs Essentia en base | `app/adapters/analysis_repository.py` → `AnalysisRepository` |
-| Tonalité affichée / correction perso | `AnalysisRepository.effective_key`, `.save_personal_key` ; cas d'usage `services/key_correction.py` → `flip_mode` |
+| Corriger un morceau pour moi (BPM, tonalité, annuler) | `services/track_correction.py` → `correct` (`CorrectionChanges`), `flip_mode` ; `AnalysisRepository.personal_correction`, `.save_personal_correction`, `.effective_key` ; route `PATCH /tracks/{id}/correction` (champ absent = inchangé, `null` = annuler) |
 | Test d'une route qui exige une session | fixture `logged_in_client` (`tests/conftest.py`) |
 | Dépendances de route | `app/api/deps.py` → `get_db`, `get_queue`, `get_track_repository`, `get_current_user_id` (exige une session) |
 | Erreur de service musical → HTTP | `app/api/errors.py` (404 / 401 / 502, déjà branché) |
@@ -105,6 +105,7 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Playlists côté front | `web/src/app/core/api/playlist.service.ts` → `PlaylistService` |
 | Playlist « en cours » (front) | `web/src/app/core/current-playlist.service.ts` → `CurrentPlaylistService` ; pour les tests des pages : `FakeCurrentPlaylistService` (`current-playlist.service.fake.ts`) |
 | Bouton ★ / ☆ (front) | `web/src/app/shared/favorite-button/` |
+| Bouton « Corriger » (BPM ×2 / ÷2, tonalité, annuler) | `web/src/app/shared/track-correction/` (émet le morceau corrigé) |
 | Bouton « + Ajouter », barre « Playlist en cours » | `web/src/app/shared/add-to-playlist/`, `web/src/app/shared/current-playlist-bar/` |
 | Libellés et texte d'un enchaînement, écart de BPM signé (front) | `web/src/app/shared/key-moves.ts` → `KEY_MOVE_LABELS`, `formatBpmChange`, `describeTransition` |
 | Playlist en texte (TXT détaillé ou tracklist) | `web/src/app/shared/playlist-text.ts` → `playlistText`, `playlistFileName` (généré côté front : pas de route API) |
@@ -220,6 +221,8 @@ réécrite se vérifie avant/après dans une transaction `REPEATABLE READ` (rés
   base 0, n'exécute pas leurs tâches.
 - **Écart de BPM : `bpm_diff` (absolu, sert au score) ≠ `bpm_change` (signé en %, sert à l'affichage)**. Un
   enchaînement refusé garde `key_distance` et `tempo_ok` / `same_mode` pour expliquer pourquoi.
+- **Formulaire avec nos propres messages d'erreur** : ajouter `novalidate`, sinon un `<input type="number" max>`
+  bloque l'envoi (validation native du navigateur) avant notre contrôle.
 - **Fixtures `client` et `logged_in_client` = le même objet** (la seconde ajoute le cookie à la première) : pour
   tester un 401, écrire un test séparé qui ne demande que `client`.
 - **Les tests PostgreSQL tournent sur la base de dev** (choix assumé), qui contient de vrais morceaux
@@ -255,8 +258,8 @@ playlists, worker d'analyse (Deezer + Essentia), catalogue filtrable (page `/cat
 la qualité des enchaînements, playlist en cours + « + Ajouter », glisser-déposer `@angular/cdk`), export vers
 Spotify (playlist privée, réexport = mise à jour), export TXT (détaillé ou tracklist),
 favoris (★, filtre, comptent dans « mes morceaux » ; pas d'import des titres likés Spotify). **Non vérifié** : la playlist exportée apparaît dans rekordbox.
-À faire : corrections manuelles (corriger un BPM, saisir une tonalité,
-annuler une correction).
+**V1 terminée** avec les corrections manuelles (BPM avec ×2 / ÷2, tonalité, annuler ma correction).
+Prochaines idées (à décider) : filtre « BPM suspects » (demi/double tempo), corrections globales (admin).
 
 Retirés (16/10/2026) : **import XML rekordbox** (l'autrice utilise rekordbox seulement comme destination, via
 Spotify) et donc **export M3U** (sans import rekordbox, aucun chemin de fichier audio : un M3U serait vide).

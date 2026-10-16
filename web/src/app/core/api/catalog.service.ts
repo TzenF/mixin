@@ -55,6 +55,12 @@ export interface SuggestionOptions {
   favoritesOnly: boolean;
 }
 
+/** Correction à envoyer : un champ absent reste tel quel ; à null, ma correction de ce champ est annulée. */
+export interface CorrectionChanges {
+  bpm?: number | null;
+  key?: string | null;
+}
+
 /** Tonalité affichée après une correction perso. */
 export interface KeyCorrected {
   camelot: string;
@@ -136,5 +142,13 @@ export class CatalogService {
   setFavorite(trackId: string, favorite: boolean): Observable<void> {
     const url = `/api/tracks/${encodeURIComponent(trackId)}/favorite`;
     return favorite ? this.http.put<void>(url, null) : this.http.delete<void>(url);
+  }
+
+  /** Corrige le BPM et/ou la tonalité (pour moi seulement) ; renvoie le morceau mis à jour. */
+  correct(trackId: string, changes: CorrectionChanges): Observable<CatalogTrack> {
+    return this.http.patch<CatalogTrack>(
+      `/api/tracks/${encodeURIComponent(trackId)}/correction`,
+      changes,
+    );
   }
 }

@@ -265,3 +265,59 @@ def test_favorites_require_a_session(client: TestClient) -> None:
     # Pas logged_in_client dans le même test : c'est le même objet que client, avec le cookie en plus
     assert client.put(f"/tracks/{uuid.uuid4()}/favorite").status_code == 401
     assert client.delete(f"/tracks/{uuid.uuid4()}/favorite").status_code == 401
+
+
+def _correct(client: TestClient, track_id: str, **body: Any) -> dict[str, Any]:
+    """Envoie une correction (doit réussir) et renvoie le morceau mis à jour."""
+    resp = client.patch(f"/tracks/{track_id}/correction", json=body)
+    assert resp.status_code == 200, resp.text
+    return resp.json()
+
+
+def _values(track: dict[str, Any]) -> tuple[Any, ...]:
+    """(bpm, source du bpm, tonalité, source de la tonalité)."""
+    return track["bpm"], track["bpm_source"], track["camelot"], track["key_source"]
+
+
+def test_correct_one_field_at_a_time_then_cancel(
+    logged_in_client: TestClient, catalog: str, user_id: uuid.UUID
+) -> None:
+    alpha = _row(logged_in_client, catalog, "Alpha")["id"]  # Essentia : 124.0, 6A
+
+    assert _values(_correct(logged_in_client, alpha, bpm=62.04)) == (62.0, "manual", "6A", "essentia")
+    assert _values(_correct(logged_in_client, alpha, key="Am")) == (62.0, "manual", "8A", "manual")
+    assert _values(_correct(logged_in_client, alpha, bpm=None)) == (124.0, "essentia", "8A", "manual")
+    assert _values(_correct(logged_in_client, alpha, key=None)) == (124.0, "essentia", "6A", "essentia")
+
+    with psycopg.connect(get_settings().database_url) as conn:
+        rows = conn.execute(
+            "SELECT source::text, bpm::float FROM track_analysis WHERE track_id = %s ORDER BY 1", (alpha,)
+        ).fetchall()
+    assert rows == [("essentia", 124.0)]  # plus de correction ; Essentia jamais modifiée
+
+
+def test_correct_both_fields_and_keep_flip_mode(logged_in_client: TestClient, catalog: str) -> None:
+    beta = _row(logged_in_client, catalog, "Beta")["id"]  # déjà corrigé en 8B (tonalité seulement)
+
+    assert _values(_correct(logged_in_client, beta, bpm=130)) == (130.0, "manual", "8B", "manual")
+    # ⇄ écrit dans la même correction : le BPM corrigé est gardé
+    assert logged_in_client.post(f"/tracks/{beta}/key/flip-mode").json()["camelot"] == "5A"
+    assert _values(_row(logged_in_client, catalog, "Beta")) == (130.0, "manual", "5A", "manual")
+    assert _values(_correct(logged_in_client, beta, bpm=None, key=None)) == (
+        128.0,
+        "essentia",
+        "8A",
+        "essentia",
+    )
+    assert _values(_correct(logged_in_client, beta)) == (128.0, "essentia", "8A", "essentia")  # {} : rien
+
+
+def test_correction_validation(logged_in_client: TestClient, catalog: str) -> None:
+    alpha = _row(logged_in_client, catalog, "Alpha")["id"]
+    for body in ({"bpm": 39.9}, {"bpm": 250.1}, {"key": "13Z"}, {"key": ""}, {"bpm": "rapide"}):
+        assert logged_in_client.patch(f"/tracks/{alpha}/correction", json=body).status_code == 422, body
+    assert logged_in_client.patch(f"/tracks/{uuid.uuid4()}/correction", json={"bpm": 120}).status_code == 404
+
+
+def test_corrections_require_a_session(client: TestClient) -> None:
+    assert client.patch(f"/tracks/{uuid.uuid4()}/correction", json={"bpm": 120}).status_code == 401

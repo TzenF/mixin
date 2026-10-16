@@ -134,6 +134,11 @@
               <td class="muted">{{ track.artists.join(', ') }}</td>
               <td class="number" data-testid="bpm">
                 {{ track.bpm === null ? '—' : (track.bpm | number: '1.1-1') }}
+                @if (track.bpm_source === 'manual') {
+                  <span class="corrected" data-testid="bpm-corrected" title="Corrigé par toi"
+                    >corrigé</span
+                  >
+                }
               </td>
               <td class="key">
                 <span data-testid="camelot">{{ track.camelot ?? '—' }}</span>
@@ -169,6 +174,7 @@
                   Suggestions
                 </button>
                 <app-add-to-playlist [trackId]="track.id" />
+                <app-track-correction [track]="track" (corrected)="onCorrected($event)" />
               </td>
             </tr>
           }

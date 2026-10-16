@@ -5,14 +5,21 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.adapters.db import Database
 from app.adapters.queue import TaskQueue
 from app.adapters.track_repository import CatalogFilters, CatalogSort, TrackRepository
 from app.api.deps import get_current_user_id, get_db, get_queue, get_track_repository
 from app.domain.camelot import CamelotKey
-from app.services.key_correction import NoKeyToFlipError, flip_mode
+from app.services.track_correction import (
+    BPM_MAX,
+    BPM_MIN,
+    CorrectionChanges,
+    NoKeyToFlipError,
+    correct,
+    flip_mode,
+)
 
 router = APIRouter(prefix="/tracks", tags=["tracks"])
 
@@ -131,10 +138,45 @@ async def suggestions(
 @router.get("/{track_id}")
 async def get_track(track_id: UUID, tracks: Tracks, user_id: CurrentUser) -> CatalogTrack:
     """Un morceau et ses valeurs affichées, même hors de mes playlists ; 404 s'il n'existe pas."""
+    return await _track_view(tracks, user_id, track_id)
+
+
+async def _track_view(tracks: TrackRepository, user_id: UUID, track_id: UUID) -> CatalogTrack:
+    """Le morceau tel que le voit l'utilisateur (ses corrections comprises) ; 404 s'il n'existe pas."""
     page = await tracks.catalog(user_id, CatalogFilters(only_mine=False, track_id=track_id, limit=1))
     if not page.items:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Morceau inconnu")
     return CatalogTrack(**asdict(page.items[0]))
+
+
+class CorrectionIn(BaseModel):
+    """Champs à corriger : un champ absent reste tel quel ; à null, ma correction de ce champ est annulée."""
+
+    bpm: Annotated[float, Field(ge=BPM_MIN, le=BPM_MAX)] | None = None
+    key: Annotated[str, Field(min_length=1, max_length=10, description="Ex. 8A, Am, F#m")] | None = None
+
+
+@router.patch("/{track_id}/correction")
+async def correct_track(
+    track_id: UUID,
+    body: CorrectionIn,
+    tracks: Tracks,
+    user_id: CurrentUser,
+    db: Annotated[Database, Depends(get_db)],
+) -> CatalogTrack:
+    """Corrige le BPM et/ou la tonalité (pour moi seulement) ; renvoie le morceau mis à jour."""
+    await _ensure_exists(tracks, track_id)
+    try:
+        key = CamelotKey.parse(body.key) if body.key is not None else None
+    except ValueError as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from e
+    changes = CorrectionChanges(
+        fields=frozenset(body.model_fields_set),
+        bpm=round(body.bpm, 1) if body.bpm is not None else None,
+        key=key,
+    )
+    await correct(db, user_id, track_id, changes)
+    return await _track_view(tracks, user_id, track_id)
 
 
 class AnalysisRequested(BaseModel):

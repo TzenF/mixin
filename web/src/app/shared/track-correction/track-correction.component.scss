@@ -1,0 +1,23 @@
+@use 'mixins' as m;
+@use 'tokens' as t;
+
+.correction {
+  @include m.filter-bar;
+  margin-bottom: 0;
+
+  input[type='number'] {
+    width: t.$width-field-sm;
+  }
+}
+
+button {
+  @include m.button-primary;
+}
+
+button.secondary {
+  @include m.button-secondary;
+}
+
+.error {
+  @include m.text-danger;
+}
