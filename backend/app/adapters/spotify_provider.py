@@ -100,6 +100,9 @@ class SpotifyProvider:
         """Suit les liens `next` et renvoie tous les éléments de toutes les pages."""
         items: list[dict[str, Any]] = []
         while url and len(items) < MAX_ITEMS:
+            # Le jeton part avec chaque requête : on ne suit que des liens vers l'API Spotify.
+            if not url.startswith(f"{API}/"):
+                raise MusicProviderError("Spotify a renvoyé un lien de page inattendu")
             page = await self._get(access_token, url)
             items.extend(page.get("items") or [])
             url = page.get("next")

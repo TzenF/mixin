@@ -7,7 +7,7 @@ import httpx
 import pytest
 
 from app.adapters.spotify_provider import SpotifyApiError, SpotifyProvider
-from app.domain.music_provider import PlaylistNotFoundError
+from app.domain.music_provider import MusicProviderError, PlaylistNotFoundError
 
 pytestmark = pytest.mark.anyio
 
@@ -134,3 +134,19 @@ async def test_display_name_falls_back_to_spotify_id() -> None:
     user = await _api({"/v1/me": _json({"id": "katia", "display_name": None})}).get_current_user("jeton")
 
     assert user.display_name == "katia"
+
+
+async def test_does_not_send_the_token_to_a_foreign_next_link() -> None:
+    hosts: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        """Note l'hôte appelé ; la première page pointe vers un autre site."""
+        hosts.append(request.url.host)
+        if request.url.path == "/v1/me":
+            return httpx.Response(200, json=ME)
+        return httpx.Response(200, json={"items": [], "next": "https://ailleurs.example/v1/me/playlists"})
+
+    provider = SpotifyProvider(httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+    with pytest.raises(MusicProviderError, match="lien de page inattendu"):
+        await provider.get_user_playlists("jeton")
+    assert set(hosts) == {"api.spotify.com"}

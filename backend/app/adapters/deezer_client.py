@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import quote, urlsplit
 
 import httpx
 
@@ -16,10 +17,16 @@ from app.adapters.http_retry import request_with_retry
 
 DEEZER_API = "https://api.deezer.com"
 _NO_DATA = 800
+# Un extrait de 30 s pèse environ 480 Ko (mesuré en octobre 2026) : au-delà de 5 Mo, ce n'en est pas un.
+MAX_PREVIEW_BYTES = 5_000_000
 
 
 class DeezerUnavailableError(Exception):
     """Deezer ne répond pas correctement pour l'instant (quota, panne, réseau) : réessayer plus tard."""
+
+
+class InvalidPreviewError(Exception):
+    """L'extrait proposé par Deezer est refusé (pas en HTTPS, ou trop gros) : inutile de réessayer."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,7 +45,8 @@ class DeezerClient:
 
     async def find_by_isrc(self, isrc: str) -> DeezerTrack | None:
         """Cherche le morceau par ISRC ; None si Deezer ne le connaît pas."""
-        data = (await self._get(f"{DEEZER_API}/track/isrc:{isrc}")).json()
+        # L'ISRC vient de Spotify : encodé pour qu'un « / » ou un « ? » ne change pas l'URL appelée.
+        data = (await self._get(f"{DEEZER_API}/track/isrc:{quote(isrc, safe='')}")).json()
         if error := data.get("error"):
             if error.get("code") == _NO_DATA:
                 return None
@@ -48,8 +56,25 @@ class DeezerClient:
         return DeezerTrack(str(data["id"]), data.get("preview") or None)
 
     async def download(self, url: str, dest: Path) -> None:
-        """Télécharge l'extrait dans le fichier `dest`."""
-        dest.write_bytes((await self._get(url)).content)
+        """Télécharge l'extrait dans le fichier `dest` (HTTPS uniquement, taille plafonnée)."""
+        # L'URL est signée : on ne la journalise pas en entier.
+        if urlsplit(url).scheme != "https":
+            raise InvalidPreviewError("Extrait refusé : URL qui n'est pas en HTTPS")
+        try:
+            async with self._client.stream("GET", url) as resp:
+                if resp.status_code != 200:
+                    raise DeezerUnavailableError(f"Extrait Deezer : HTTP {resp.status_code}")
+                if resp.url.scheme != "https":  # redirection vers HTTP
+                    raise InvalidPreviewError("Extrait refusé : redirigé hors HTTPS")
+                size = 0
+                with dest.open("wb") as file:
+                    async for chunk in resp.aiter_bytes():
+                        size += len(chunk)
+                        if size > MAX_PREVIEW_BYTES:
+                            raise InvalidPreviewError(f"Extrait refusé : plus de {MAX_PREVIEW_BYTES} octets")
+                        file.write(chunk)
+        except httpx.HTTPError as e:
+            raise DeezerUnavailableError(f"Extrait Deezer injoignable : {e.__class__.__name__}") from e
 
     async def _get(self, url: str) -> httpx.Response:
         """Envoie un GET ; lève DeezerUnavailableError si Deezer ne répond pas par un 200."""

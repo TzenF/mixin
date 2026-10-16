@@ -6,7 +6,13 @@ from pathlib import Path
 import httpx
 import pytest
 
-from app.adapters.deezer_client import DeezerClient, DeezerTrack, DeezerUnavailableError
+from app.adapters.deezer_client import (
+    MAX_PREVIEW_BYTES,
+    DeezerClient,
+    DeezerTrack,
+    DeezerUnavailableError,
+    InvalidPreviewError,
+)
 
 pytestmark = pytest.mark.anyio
 
@@ -55,7 +61,34 @@ async def test_network_error_means_retry_later() -> None:
         await _deezer(respond).find_by_isrc("X")
 
 
+async def test_isrc_is_encoded_in_the_url() -> None:
+    def respond(request: httpx.Request) -> httpx.Response:
+        """Vérifie que l'ISRC reste un seul segment de chemin, sans query."""
+        assert request.url.raw_path == b"/track/isrc:AB%2F..%3Fx%3D1"
+        return httpx.Response(200, json={"id": 1, "preview": ""})
+
+    await _deezer(respond).find_by_isrc("AB/..?x=1")
+
+
 async def test_download_writes_the_file(tmp_path: Path) -> None:
     dest = tmp_path / "extrait.mp3"
     await _deezer(lambda _req: httpx.Response(200, content=b"ID3...")).download("https://cdn/x.mp3", dest)
     assert dest.read_bytes() == b"ID3..."
+
+
+async def test_download_refuses_plain_http(tmp_path: Path) -> None:
+    deezer = _deezer(lambda _req: httpx.Response(200, content=b"ID3"))
+    with pytest.raises(InvalidPreviewError):
+        await deezer.download("http://cdn/x.mp3", tmp_path / "extrait.mp3")
+
+
+async def test_download_refuses_a_file_too_big(tmp_path: Path) -> None:
+    deezer = _deezer(lambda _req: httpx.Response(200, content=b"x" * (MAX_PREVIEW_BYTES + 1)))
+    with pytest.raises(InvalidPreviewError):
+        await deezer.download("https://cdn/x.mp3", tmp_path / "extrait.mp3")
+
+
+async def test_download_error_means_retry_later(tmp_path: Path) -> None:
+    deezer = _deezer(lambda _req: httpx.Response(503))
+    with pytest.raises(DeezerUnavailableError, match="503"):
+        await deezer.download("https://cdn/x.mp3", tmp_path / "extrait.mp3")
