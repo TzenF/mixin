@@ -94,4 +94,18 @@ export class PlaylistService {
       null,
     );
   }
+
+  /** Change l'ordre des morceaux (tous les item_id, dans le nouvel ordre) ; 422 si la playlist a changé. */
+  reorder(playlistId: string, itemIds: number[]): Observable<void> {
+    return this.http.put<void>(`/api/playlists/${encodeURIComponent(playlistId)}/order`, {
+      item_ids: itemIds,
+    });
+  }
+
+  /** Retire un morceau de la playlist (les suivants remontent d'une place). */
+  removeItem(playlistId: string, itemId: number): Observable<void> {
+    return this.http.delete<void>(
+      `/api/playlists/${encodeURIComponent(playlistId)}/items/${itemId}`,
+    );
+  }
 }

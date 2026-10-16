@@ -22,7 +22,11 @@ class PlaylistReadOnlyError(Exception):
 
 
 class TrackMissingError(Exception):
-    """Le morceau à ajouter n'existe pas."""
+    """Le morceau à ajouter n'existe pas, ou l'élément à retirer n'est pas dans la playlist."""
+
+
+class OrderMismatchError(Exception):
+    """Le nouvel ordre ne contient pas exactement les éléments actuels (page périmée : recharger)."""
 
 
 class PlaylistEditor:
@@ -59,6 +63,26 @@ class PlaylistEditor:
                 raise TrackMissingError("Morceau inconnu")
             await repo.lock(playlist_id)
             return await repo.append_item(playlist_id, track_id)
+
+    async def reorder(self, owner_id: UUID, playlist_id: UUID, item_ids: list[int]) -> None:
+        """Remplace l'ordre des morceaux ; la liste doit contenir exactement les éléments actuels."""
+        async with self._db.transaction() as tx:
+            repo = PlaylistRepository(tx)
+            await _editable(repo, owner_id, playlist_id)
+            await repo.lock(playlist_id)
+            current = await repo.item_ids(playlist_id)
+            if len(item_ids) != len(current) or set(item_ids) != set(current):
+                raise OrderMismatchError("La playlist a changé entre-temps : recharge-la")
+            await repo.reorder(playlist_id, item_ids)
+
+    async def remove_item(self, owner_id: UUID, playlist_id: UUID, item_id: int) -> None:
+        """Retire un morceau de la playlist (les suivants remontent d'une place)."""
+        async with self._db.transaction() as tx:
+            repo = PlaylistRepository(tx)
+            await _editable(repo, owner_id, playlist_id)
+            await repo.lock(playlist_id)
+            if not await repo.remove_item(playlist_id, item_id):
+                raise TrackMissingError("Ce morceau n'est pas dans la playlist")
 
     async def copy(self, owner_id: UUID, playlist_id: UUID) -> PlaylistRow:
         """Duplique une de mes playlists (importée ou non) en une playlist modifiable, « X (copie) »."""

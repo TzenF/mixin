@@ -146,6 +146,41 @@ class PlaylistRepository:
         await self._touch(playlist_id)
         return row["id"], row["position"]
 
+    async def item_ids(self, playlist_id: UUID) -> list[int]:
+        """Identifiants des éléments de la playlist, dans l'ordre."""
+        rows = await self._db.fetch_all(
+            "SELECT id FROM playlist_item WHERE playlist_id = %(id)s ORDER BY position", {"id": playlist_id}
+        )
+        return [r["id"] for r in rows]
+
+    async def reorder(self, playlist_id: UUID, item_ids: list[int]) -> None:
+        """Place les éléments dans cet ordre (0, 1, 2…) ; unicité des positions vérifiée au commit."""
+        await self._db.fetch_one(
+            """UPDATE playlist_item pi SET position = (t.ord - 1)::integer
+               FROM unnest(%(ids)s::bigint[]) WITH ORDINALITY AS t(id, ord)
+               WHERE pi.id = t.id AND pi.playlist_id = %(playlist_id)s""",
+            {"playlist_id": playlist_id, "ids": item_ids},
+        )
+        await self._touch(playlist_id)
+
+    async def remove_item(self, playlist_id: UUID, item_id: int) -> bool:
+        """Retire l'élément et recompacte les positions ; False s'il n'est pas dans cette playlist."""
+        row = await self._db.fetch_one(
+            "DELETE FROM playlist_item WHERE id = %(item)s AND playlist_id = %(id)s RETURNING id",
+            {"id": playlist_id, "item": item_id},
+        )
+        if row is None:
+            return False
+        await self._db.fetch_one(
+            """UPDATE playlist_item pi SET position = (r.rn - 1)::integer
+               FROM (SELECT id, row_number() OVER (ORDER BY position) AS rn
+                     FROM playlist_item WHERE playlist_id = %(id)s) r
+               WHERE pi.id = r.id""",
+            {"id": playlist_id},
+        )
+        await self._touch(playlist_id)
+        return True
+
     async def copy_items(self, source_id: UUID, target_id: UUID) -> None:
         """Recopie les morceaux de `source_id` dans `target_id`, dans le même ordre."""
         await self._db.fetch_one(

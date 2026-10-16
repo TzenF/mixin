@@ -246,3 +246,73 @@ async def test_simultaneous_adds_get_distinct_positions(
     )
 
     assert sorted(position for _, position in added) == [5, 6, 7, 8, 9]
+
+
+def _titles_and_positions(client: TestClient, playlist_id: str, prefix: str) -> list[tuple[str, int]]:
+    """(titre sans préfixe, position) des morceaux de la playlist, dans l'ordre."""
+    items = _detail(client, playlist_id)["items"]
+    return [(i["track"]["title"].removeprefix(f"{prefix} "), i["position"]) for i in items]
+
+
+def test_reorder(logged_in_client: TestClient, playlists: dict[str, str], test_prefix: str) -> None:
+    mine = playlists["mine"]
+    ids = [i["item_id"] for i in _detail(logged_in_client, mine)["items"]]  # A B C D E
+
+    new_order = [ids[4], ids[0], ids[1], ids[2], ids[3]]
+    assert logged_in_client.put(f"/playlists/{mine}/order", json={"item_ids": new_order}).status_code == 204
+    assert _titles_and_positions(logged_in_client, mine, test_prefix) == [
+        ("E", 0),
+        ("A", 1),
+        ("B", 2),
+        ("C", 3),
+        ("D", 4),
+    ]
+    # Les enchaînements suivent le nouvel ordre : E (12A) -> A (6A) est à 6 crans
+    first = _detail(logged_in_client, mine)["items"][0]["transition_to_next"]
+    assert (first["key_move"], first["key_distance"]) == (None, 6)
+
+
+def test_reorder_refuses_a_stale_or_foreign_list(
+    logged_in_client: TestClient, playlists: dict[str, str]
+) -> None:
+    mine = playlists["mine"]
+    ids = [i["item_id"] for i in _detail(logged_in_client, mine)["items"]]
+    other_ids = [i["item_id"] for i in _detail(logged_in_client, playlists["imported"])["items"]]
+
+    for wrong in (ids[:-1], [*ids, ids[0]], [*ids[:-1], other_ids[0]], []):  # manque, doublon, intrus, vide
+        assert logged_in_client.put(f"/playlists/{mine}/order", json={"item_ids": wrong}).status_code == 422
+    assert [i["item_id"] for i in _detail(logged_in_client, mine)["items"]] == ids  # rien n'a bougé
+    assert (
+        logged_in_client.put(
+            f"/playlists/{playlists['imported']}/order", json={"item_ids": other_ids}
+        ).status_code
+        == 409
+    )
+
+
+def test_remove_item_compacts_positions(
+    logged_in_client: TestClient, playlists: dict[str, str], test_prefix: str
+) -> None:
+    mine = playlists["mine"]
+    ids = [i["item_id"] for i in _detail(logged_in_client, mine)["items"]]
+
+    assert logged_in_client.delete(f"/playlists/{mine}/items/{ids[1]}").status_code == 204  # retire B
+    assert _titles_and_positions(logged_in_client, mine, test_prefix) == [
+        ("A", 0),
+        ("C", 1),
+        ("D", 2),
+        ("E", 3),
+    ]
+    assert logged_in_client.delete(f"/playlists/{mine}/items/{ids[1]}").status_code == 404  # déjà retiré
+    imported_item = _detail(logged_in_client, playlists["imported"])["items"][0]["item_id"]
+    assert logged_in_client.delete(f"/playlists/{mine}/items/{imported_item}").status_code == 404  # pas ici
+    assert (
+        logged_in_client.delete(f"/playlists/{playlists['imported']}/items/{imported_item}").status_code
+        == 409
+    )
+
+
+def test_order_and_removal_require_a_session(client: TestClient) -> None:
+    some_id = uuid.uuid4()
+    assert client.put(f"/playlists/{some_id}/order", json={"item_ids": []}).status_code == 401
+    assert client.delete(f"/playlists/{some_id}/items/1").status_code == 401

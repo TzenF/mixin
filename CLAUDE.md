@@ -76,7 +76,7 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Utilisateurs, comptes musicaux | `app/adapters/user_repository.py` → `UserRepository` |
 | Sessions de connexion | `app/services/sessions.py` → `SessionService` (dépôt : `SessionRepository`) |
 | Playlists en base | `app/adapters/playlist_repository.py` → `PlaylistRepository` (dont `list_for_owner`, `get_for_owner`, `items_with_transitions`) ; routes `GET /playlists`, `GET /playlists/{id}` |
-| Modifier mes playlists (créer, renommer, ajouter, dupliquer, supprimer) | `app/services/playlist_editor.py` → `PlaylistEditor` (importée = lecture seule → 409 ; pas à moi → 404, via `api/errors.py`) |
+| Modifier mes playlists (créer, renommer, ajouter, réordonner, retirer, dupliquer, supprimer) | `app/services/playlist_editor.py` → `PlaylistEditor` (importée = lecture seule → 409 ; pas à moi → 404 ; ordre périmé → 422, via `api/errors.py`). Écritures : verrou `PlaylistRepository.lock` dans une transaction |
 | Journal des imports | `app/adapters/import_job_repository.py` → `ImportJobRepository` |
 | Appel HTTP vers une API externe | `app/adapters/http_retry.py` → `request_with_retry` (gère les 429 / `Retry-After`) |
 | Chiffrer un jeton avant stockage | `app/adapters/token_cipher.py` → `TokenCipher` (clé `TOKEN_ENCRYPTION_KEY`) |
@@ -240,8 +240,9 @@ appel) et en-têtes de sécurité (CSP, HSTS), sauvegardes PostgreSQL, worker su
 
 Fait : spikes, schéma, squelette (Compose, API, worker, front, CI), règles de code, OAuth Spotify + import des
 playlists, worker d'analyse (Deezer + Essentia), catalogue filtrable (page `/catalog`), bouton
-« inverser majeur/mineur », page d'accueil, page Suggestions (`/suggestions/:trackId`, enchaînement au clic).
-À faire, dans l'ordre : playlists, favoris → export Spotify / TXT / M3U → import XML rekordbox (avec écran des morceaux
+« inverser majeur/mineur », page d'accueil, page Suggestions (`/suggestions/:trackId`, enchaînement au clic), playlists (lecture avec
+la qualité des enchaînements, playlist en cours + « + Ajouter », glisser-déposer `@angular/cdk`).
+À faire, dans l'ordre : favoris → export Spotify / TXT / M3U → import XML rekordbox (avec écran des morceaux
 non reconnus) et corrections manuelles.
 
 Hors V1 (ne pas anticiper) : extraits audio dans le navigateur, partage/commentaires, page Discover,

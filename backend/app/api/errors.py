@@ -9,7 +9,12 @@ from app.adapters.spotify_auth import SpotifyAuthError
 from app.adapters.spotify_provider import SpotifyApiError
 from app.adapters.token_cipher import TokenCipherError
 from app.domain.music_provider import MusicProviderError, PlaylistNotFoundError
-from app.services.playlist_editor import PlaylistMissingError, PlaylistReadOnlyError, TrackMissingError
+from app.services.playlist_editor import (
+    OrderMismatchError,
+    PlaylistMissingError,
+    PlaylistReadOnlyError,
+    TrackMissingError,
+)
 
 log = logging.getLogger(__name__)
 
@@ -48,6 +53,11 @@ async def _read_only(request: Request, exc: Exception) -> JSONResponse:
     return JSONResponse({"detail": str(exc)}, status_code=status.HTTP_409_CONFLICT)
 
 
+async def _stale_order(request: Request, exc: Exception) -> JSONResponse:
+    """Réponse 422 : l'ordre envoyé ne correspond plus au contenu de la playlist."""
+    return JSONResponse({"detail": str(exc)}, status_code=status.HTTP_422_UNPROCESSABLE_CONTENT)
+
+
 def register_error_handlers(app: FastAPI) -> None:
     """Branche les gestionnaires d'erreurs sur l'application."""
     app.add_exception_handler(MusicProviderError, _music_provider_error)
@@ -55,3 +65,4 @@ def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(PlaylistMissingError, _not_found)
     app.add_exception_handler(TrackMissingError, _not_found)
     app.add_exception_handler(PlaylistReadOnlyError, _read_only)
+    app.add_exception_handler(OrderMismatchError, _stale_order)

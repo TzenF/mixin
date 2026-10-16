@@ -84,30 +84,58 @@
     @if (playlist.items.length === 0) {
       <p class="hint" data-testid="empty">Cette playlist est vide.</p>
     } @else {
-      <ol data-testid="items">
+      <ol
+        cdkDropList
+        [cdkDropListData]="playlist.items"
+        [cdkDropListDisabled]="playlist.source_provider !== null"
+        (cdkDropListDropped)="drop($event)"
+        data-testid="items"
+      >
         @for (row of rows(); track row.item.item_id; let i = $index) {
-          <li class="track" data-testid="item">
-            <span class="index">{{ i + 1 }}</span>
-            <span class="what">
-              <span class="title">{{ row.item.track.title }}</span>
-              <span class="hint">{{ row.item.track.artists.join(', ') }}</span>
-            </span>
-            <span class="values">
-              {{ row.item.track.bpm === null ? '—' : (row.item.track.bpm | number: '1.1-1') }} BPM ·
-              {{ row.item.track.camelot ?? '—' }}
-            </span>
-            <button
-              type="button"
-              class="secondary"
-              (click)="openSuggestions(row.item.track)"
-              data-testid="open-suggestions"
-            >
-              Suggestions
-            </button>
+          <li cdkDrag [cdkDragData]="row.item" class="entry">
+            <div class="track" data-testid="item">
+              @if (playlist.source_provider === null) {
+                <span
+                  cdkDragHandle
+                  class="handle"
+                  title="Glisser pour déplacer"
+                  aria-label="Glisser pour déplacer"
+                  >⠿</span
+                >
+              }
+              <span class="index">{{ i + 1 }}</span>
+              <span class="what">
+                <span class="title">{{ row.item.track.title }}</span>
+                <span class="hint">{{ row.item.track.artists.join(', ') }}</span>
+              </span>
+              <span class="values">
+                {{ row.item.track.bpm === null ? '—' : (row.item.track.bpm | number: '1.1-1') }} BPM
+                ·
+                {{ row.item.track.camelot ?? '—' }}
+              </span>
+              <button
+                type="button"
+                class="secondary"
+                (click)="openSuggestions(row.item.track)"
+                data-testid="open-suggestions"
+              >
+                Suggestions
+              </button>
+              @if (playlist.source_provider === null) {
+                <button
+                  type="button"
+                  class="secondary"
+                  (click)="removeItem(row.item)"
+                  data-testid="remove-item"
+                >
+                  Retirer
+                </button>
+              }
+            </div>
+            @if (row.transition; as t) {
+              <p [class]="'transition ' + t.kind" data-testid="transition">{{ t.text }}</p>
+            }
           </li>
-          @if (row.transition; as t) {
-            <li [class]="'transition ' + t.kind" data-testid="transition">{{ t.text }}</li>
-          }
         }
       </ol>
     }

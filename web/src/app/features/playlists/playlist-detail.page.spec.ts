@@ -1,6 +1,8 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { CdkDropList } from '@angular/cdk/drag-drop';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { CatalogTrack } from '../../core/api/catalog.service';
 import { PlaylistDetail, Transition } from '../../core/api/playlist.service';
@@ -217,5 +219,77 @@ describe('PlaylistDetailPage', () => {
 
     expect(navigate).toHaveBeenCalledWith(['/playlists']);
     confirm.mockRestore();
+  });
+
+  /** Simule un glisser-déposer du morceau à la position `from` vers `to`. */
+  function dragAndDrop(
+    fixture: ComponentFixture<PlaylistDetailPage>,
+    from: number,
+    to: number,
+  ): void {
+    fixture.debugElement
+      .query(By.directive(CdkDropList))
+      .triggerEventHandler('cdkDropListDropped', { previousIndex: from, currentIndex: to });
+    fixture.detectChanges();
+  }
+
+  /** Titres affichés, dans l'ordre. */
+  function titles(fixture: ComponentFixture<PlaylistDetailPage>): (string | null | undefined)[] {
+    return all(fixture, 'item').map((i) => i.querySelector('.title')?.textContent);
+  }
+
+  it('déplace un morceau : affiché tout de suite, enregistré, puis enchaînements recalculés', async () => {
+    const fixture = await render((req) => req.flush(PLAYLIST));
+
+    dragAndDrop(fixture, 2, 0);
+    expect(titles(fixture)).toEqual(['Trop rapide', 'Losing It', 'Rock That Body']);
+
+    const req = http.expectOne('/api/playlists/set/order');
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual({ item_ids: [3, 1, 2] });
+    req.flush(null, { status: 204, statusText: '' });
+    // rechargement discret : la page ne repasse pas par « Chargement… »
+    expect(all(fixture, 'loading').length).toBe(0);
+    http.expectOne('/api/playlists/set').flush(PLAYLIST);
+  });
+
+  it('recharge si la playlist a changé entre-temps (422)', async () => {
+    const fixture = await render((req) => req.flush(PLAYLIST));
+
+    dragAndDrop(fixture, 0, 1);
+    http
+      .expectOne('/api/playlists/set/order')
+      .flush({ detail: 'La playlist a changé' }, { status: 422, statusText: '' });
+    http.expectOne('/api/playlists/set').flush(PLAYLIST);
+    await fixture.whenStable();
+
+    expect(all(fixture, 'action-error')[0].textContent).toContain('a changé entre-temps');
+    expect(titles(fixture)).toEqual(['Losing It', 'Rock That Body', 'Trop rapide']);
+  });
+
+  it('retire un morceau', async () => {
+    const fixture = await render((req) => req.flush(PLAYLIST));
+
+    all(fixture, 'remove-item')[1].click();
+    const req = http.expectOne('/api/playlists/set/items/2');
+    expect(req.request.method).toBe('DELETE');
+    req.flush(null, { status: 204, statusText: '' });
+    http
+      .expectOne('/api/playlists/set')
+      .flush({ ...PLAYLIST, items: [PLAYLIST.items[0], PLAYLIST.items[2]] });
+    await fixture.whenStable();
+
+    expect(titles(fixture)).toEqual(['Losing It', 'Trop rapide']);
+  });
+
+  it('une importée ne se réordonne pas et ne se modifie pas', async () => {
+    const fixture = await render((req) => req.flush({ ...PLAYLIST, source_provider: 'spotify' }));
+
+    const dropList = fixture.debugElement
+      .query(By.directive(CdkDropList))
+      .injector.get(CdkDropList);
+    expect(dropList.disabled).toBe(true);
+    expect(all(fixture, 'remove-item').length).toBe(0);
+    expect((fixture.nativeElement as HTMLElement).querySelector('.handle')).toBeNull();
   });
 });

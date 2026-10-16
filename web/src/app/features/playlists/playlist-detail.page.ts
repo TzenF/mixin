@@ -1,3 +1,10 @@
+import {
+  CdkDrag,
+  CdkDragDrop,
+  CdkDragHandle,
+  CdkDropList,
+  moveItemInArray,
+} from '@angular/cdk/drag-drop';
 import { DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
@@ -5,7 +12,12 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { apiErrorMessage } from '../../core/api/api-error';
 import { SPOTIFY_LOGIN_URL } from '../../core/api/auth.service';
 import { CatalogTrack } from '../../core/api/catalog.service';
-import { PlaylistDetail, PlaylistService, Transition } from '../../core/api/playlist.service';
+import {
+  PlaylistDetail,
+  PlaylistItem,
+  PlaylistService,
+  Transition,
+} from '../../core/api/playlist.service';
 import { CurrentPlaylistService } from '../../core/current-playlist.service';
 import { KEY_MOVE_LABELS, formatBpmChange } from '../../shared/key-moves';
 
@@ -25,7 +37,7 @@ export interface TransitionView {
 /** Page « Playlist » : morceaux dans l'ordre et qualité de chaque enchaînement. */
 @Component({
   selector: 'app-playlist-detail-page',
-  imports: [DecimalPipe],
+  imports: [DecimalPipe, CdkDropList, CdkDrag, CdkDragHandle],
   templateUrl: './playlist-detail.page.html',
   styleUrl: './playlist-detail.page.scss',
 })
@@ -80,6 +92,11 @@ export class PlaylistDetailPage {
   /** Charge la playlist ; 401 = pas connectée, 404 = pas à moi ou inexistante. */
   protected load(): void {
     this.state.set({ kind: 'loading' });
+    this.reload();
+  }
+
+  /** Recharge la playlist sans afficher « Chargement… » (après un déplacement ou un retrait). */
+  private reload(): void {
     this.service.get(this.playlistId).subscribe({
       next: (playlist) => this.state.set({ kind: 'ready', playlist }),
       error: (err: HttpErrorResponse) => {
@@ -117,6 +134,49 @@ export class PlaylistDetailPage {
         this.currentPlaylist.refresh();
       },
       error: (err: HttpErrorResponse) => this.fail(err, 'Impossible de renommer la playlist.'),
+    });
+  }
+
+  /** Déplace un morceau (glisser-déposer) : affiché tout de suite, enregistré, puis enchaînements recalculés. */
+  protected drop(event: CdkDragDrop<PlaylistItem[]>): void {
+    const playlist = this.playlist();
+    if (playlist === null || event.previousIndex === event.currentIndex) {
+      return;
+    }
+    const items = [...playlist.items];
+    moveItemInArray(items, event.previousIndex, event.currentIndex);
+    this.state.set({ kind: 'ready', playlist: { ...playlist, items } });
+    this.actionError.set(null);
+    this.service
+      .reorder(
+        this.playlistId,
+        items.map((i) => i.item_id),
+      )
+      .subscribe({
+        next: () => this.reload(),
+        error: (err: HttpErrorResponse) => {
+          this.fail(
+            err,
+            err.status === 422
+              ? 'La playlist a changé entre-temps : elle a été rechargée.'
+              : "Impossible d'enregistrer le nouvel ordre.",
+          );
+          this.reload();
+        },
+      });
+  }
+
+  /** Retire un morceau de la playlist. */
+  protected removeItem(item: PlaylistItem): void {
+    this.actionError.set(null);
+    this.service.removeItem(this.playlistId, item.item_id).subscribe({
+      next: () => {
+        this.reload();
+        if (this.currentPlaylist.current()?.id === this.playlistId) {
+          this.currentPlaylist.select(this.playlistId); // recharge la liste de ses morceaux
+        }
+      },
+      error: (err: HttpErrorResponse) => this.fail(err, 'Impossible de retirer ce morceau.'),
     });
   }
 
@@ -159,6 +219,8 @@ export class PlaylistDetailPage {
   private fail(err: HttpErrorResponse, fallback: string): void {
     if (err.status === 401) {
       this.state.set({ kind: 'disconnected' });
+    } else if (err.status === 422) {
+      this.actionError.set(fallback);
     } else {
       this.actionError.set(apiErrorMessage(err, fallback));
     }

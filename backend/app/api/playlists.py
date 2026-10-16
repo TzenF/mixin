@@ -128,3 +128,25 @@ async def add_track(playlist_id: UUID, body: TrackToAdd, editor: Editor, user_id
 async def copy_playlist(playlist_id: UUID, editor: Editor, user_id: CurrentUser) -> PlaylistSummary:
     """Duplique une de mes playlists (même importée) en une playlist modifiable « X (copie) »."""
     return PlaylistSummary(**asdict(await editor.copy(user_id, playlist_id)))
+
+
+class NewOrder(BaseModel):
+    """Tous les éléments de la playlist (item_id), dans le nouvel ordre."""
+
+    item_ids: list[int]
+
+
+@router.put("/{playlist_id}/order", status_code=status.HTTP_204_NO_CONTENT)
+async def reorder_playlist(
+    playlist_id: UUID, body: NewOrder, editor: Editor, user_id: CurrentUser
+) -> Response:
+    """Change l'ordre des morceaux ; 422 si la liste ne correspond plus au contenu (page à recharger)."""
+    await editor.reorder(user_id, playlist_id, body.item_ids)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/{playlist_id}/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_item(playlist_id: UUID, item_id: int, editor: Editor, user_id: CurrentUser) -> Response:
+    """Retire un morceau de la playlist ; 404 s'il n'y est pas."""
+    await editor.remove_item(user_id, playlist_id, item_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

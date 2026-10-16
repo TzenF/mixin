@@ -31,6 +31,10 @@ $font-size-sm: 0.875rem;
 $font-size-md: 1rem;
 $font-weight-bold: 600;
 
+// --- Animation et transparence ---
+$duration-fast: 200ms;
+$opacity-placeholder: 0.4; // place libérée pendant un glisser-déposer
+
 // --- Largeurs ---
 $width-field-sm: 5.5rem; // petit champ numérique (BPM)
 $width-narrow: 32rem;

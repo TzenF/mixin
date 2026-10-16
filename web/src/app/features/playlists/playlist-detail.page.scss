@@ -17,6 +17,25 @@ ol {
   @include m.reset-list;
 }
 
+.entry {
+  background: var(--color-bg);
+}
+
+// Pendant le glisser-déposer : la place libérée est atténuée, les autres morceaux glissent en douceur.
+.cdk-drag-placeholder {
+  opacity: t.$opacity-placeholder;
+}
+
+.cdk-drag-animating,
+.cdk-drop-list-dragging .entry:not(.cdk-drag-placeholder) {
+  transition: transform t.$duration-fast;
+}
+
+.handle {
+  @include m.text-muted;
+  cursor: grab;
+}
+
 .track {
   @include m.panel;
   display: flex;
