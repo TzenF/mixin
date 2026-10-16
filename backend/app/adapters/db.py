@@ -51,7 +51,16 @@ class Database:
     @classmethod
     async def connect(cls, url: str) -> Database:
         """Ouvre le pool de connexions (sans attendre que la base soit joignable)."""
-        pool = AsyncConnectionPool(url, min_size=1, max_size=10, open=False, kwargs={"row_factory": dict_row})
+        # check : une connexion morte (base redémarrée) est remplacée avant d'être prêtée, au lieu de faire
+        # échouer la requête suivante.
+        pool = AsyncConnectionPool(
+            url,
+            min_size=1,
+            max_size=10,
+            open=False,
+            kwargs={"row_factory": dict_row},
+            check=AsyncConnectionPool.check_connection,
+        )
         await pool.open(wait=False)
         return cls(pool)
 
