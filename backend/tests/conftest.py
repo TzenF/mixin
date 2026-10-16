@@ -7,8 +7,10 @@ S'ils ne sont pas joignables, les tests d'intégration sont ignorés plutôt qu'
 from __future__ import annotations
 
 import asyncio
+import os
 import uuid
 from collections.abc import AsyncIterator, Iterator
+from urllib.parse import urlsplit
 
 import psycopg
 import pytest
@@ -19,6 +21,12 @@ from app.adapters.db import Database
 from app.api.deps import SESSION_COOKIE
 from app.config import get_settings
 from app.services.sessions import SessionService
+
+# Base Redis réservée aux tests : le worker de dev (base 0) n'exécute pas leurs tâches.
+# À faire avant tout appel à get_settings() par les tests ou par create_app().
+TEST_REDIS_DB = 15
+os.environ["REDIS_URL"] = urlsplit(get_settings().redis_url)._replace(path=f"/{TEST_REDIS_DB}").geturl()
+get_settings.cache_clear()
 
 
 def _services_up() -> bool:

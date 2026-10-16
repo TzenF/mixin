@@ -62,3 +62,6 @@ class WorkerSettings:
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
     max_jobs = 2  # Essentia consomme du CPU : peu de tâches en parallèle
     max_tries = MAX_TRIES
+    # Pas de résultat gardé dans Redis (le statut est dans track.analysis_status) : sinon arq refuse de
+    # remettre en file le même _job_id pendant 1 h après la fin de l'analyse.
+    keep_result = 0
