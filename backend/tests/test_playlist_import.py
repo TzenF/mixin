@@ -37,7 +37,16 @@ class FakeProvider:
         """Non utilisé ici."""
         return []
 
-    async def create_playlist(self, access_token: str, name: str, track_ids: list[str]) -> str:
+    async def create_playlist(
+        self, access_token: str, name: str, description: str, track_ids: list[str]
+    ) -> str:
+        """Non utilisé ici."""
+        return ""
+
+    async def replace_playlist_items(self, access_token: str, playlist_id: str, track_ids: list[str]) -> None:
+        """Non utilisé ici."""
+
+    def playlist_url(self, playlist_id: str) -> str:
         """Non utilisé ici."""
         return ""
 

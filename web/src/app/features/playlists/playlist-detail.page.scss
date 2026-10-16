@@ -92,6 +92,12 @@ ol {
   gap: t.$space-2;
 }
 
+.result {
+  @include m.status(success);
+  @include m.badge;
+  display: inline-block;
+}
+
 .badge {
   @include m.badge;
   @include m.status(success);

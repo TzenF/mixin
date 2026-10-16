@@ -55,6 +55,16 @@ class MusicProvider(Protocol):
         """Liste les titres likés de l'utilisateur."""
         ...
 
-    async def create_playlist(self, access_token: str, name: str, track_ids: list[str]) -> str:
-        """Crée une playlist avec ces morceaux et renvoie son identifiant chez le fournisseur."""
+    async def create_playlist(
+        self, access_token: str, name: str, description: str, track_ids: list[str]
+    ) -> str:
+        """Crée une playlist privée avec ces morceaux (dans l'ordre) ; renvoie son identifiant."""
+        ...
+
+    async def replace_playlist_items(self, access_token: str, playlist_id: str, track_ids: list[str]) -> None:
+        """Remplace tout le contenu d'une playlist de l'utilisateur par ces morceaux, dans l'ordre."""
+        ...
+
+    def playlist_url(self, playlist_id: str) -> str:
+        """Adresse web de la playlist chez le fournisseur."""
         ...

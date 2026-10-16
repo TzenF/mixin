@@ -81,7 +81,8 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Appel HTTP vers une API externe | `app/adapters/http_retry.py` → `request_with_retry` (gère les 429 / `Retry-After`) |
 | Chiffrer un jeton avant stockage | `app/adapters/token_cipher.py` → `TokenCipher` (clé `TOKEN_ENCRYPTION_KEY`) |
 | Jeton Spotify valide pour un utilisateur | `app/services/spotify_connection.py` → `SpotifyConnection.access_token(user_id)` |
-| Lire Spotify | `app/adapters/spotify_provider.py` → `SpotifyProvider` |
+| Lire Spotify, y créer / remplacer une playlist | `app/adapters/spotify_provider.py` → `SpotifyProvider` (`create_playlist`, `replace_playlist_items`, `playlist_url`) |
+| Exporter une playlist vers Spotify | `app/services/playlist_export.py` → `PlaylistExporter` (lien gardé dans `playlist_export`) ; route `POST /playlists/{id}/export/spotify` |
 | Importer une playlist | `app/services/playlist_import.py` → `PlaylistImporter` |
 | Lancer une analyse | `app/adapters/queue.py` → `TaskQueue.enqueue_analysis` (déjà dédoublonné) |
 | Analyser un morceau (exécuté par le worker) | `app/services/track_analysis.py` → `TrackAnalyzer` |
@@ -188,6 +189,10 @@ réécrite se vérifie avant/après dans une transaction `REPEATABLE READ` (rés
   `tracks` → `items` et `track` → `item`. Plus de `GET /tracks?ids=` groupé ; recherche limitée à 10 résultats.
   Pas de `audio-features`, `new-releases`, `popularity`. L'ISRC (`external_ids`) est disponible.
   Redirect URI : `127.0.0.1`, pas `localhost`. Gérer les HTTP 429 (`Retry-After`).
+  Écriture (vérifié le 16/10/2026) : `POST /me/playlists` (`public: false` → droit `playlist-modify-private`,
+  le seul demandé), `POST /playlists/{id}/items` et `PUT /playlists/{id}/items` (remplace tout) : **100 morceaux
+  max par requête**. « Supprimer » une playlist dans Spotify = ne plus la suivre : elle reste modifiable par l'API
+  mais invisible ; avant de réexporter, vérifier qu'elle est encore dans `GET /me/playlists`.
 - **Essentia** : aucune version pour Linux ARM → le worker doit tourner en x86_64.
 - « address already in use » au `make up` : changer `DB_PORT`, `REDIS_PORT`, `API_PORT` ou `WEB_PORT` dans `.env`
   (sur la machine de dev, `DB_PORT=5433`). Entre conteneurs, les ports internes ne changent pas.
@@ -241,8 +246,9 @@ appel) et en-têtes de sécurité (CSP, HSTS), sauvegardes PostgreSQL, worker su
 Fait : spikes, schéma, squelette (Compose, API, worker, front, CI), règles de code, OAuth Spotify + import des
 playlists, worker d'analyse (Deezer + Essentia), catalogue filtrable (page `/catalog`), bouton
 « inverser majeur/mineur », page d'accueil, page Suggestions (`/suggestions/:trackId`, enchaînement au clic), playlists (lecture avec
-la qualité des enchaînements, playlist en cours + « + Ajouter », glisser-déposer `@angular/cdk`).
-À faire, dans l'ordre : favoris → export Spotify / TXT / M3U → import XML rekordbox (avec écran des morceaux
+la qualité des enchaînements, playlist en cours + « + Ajouter », glisser-déposer `@angular/cdk`), export vers
+Spotify (playlist privée, réexport = mise à jour). **Non vérifié** : la playlist exportée apparaît dans rekordbox.
+À faire, dans l'ordre : export TXT / M3U → favoris → import XML rekordbox (avec écran des morceaux
 non reconnus) et corrections manuelles.
 
 Hors V1 (ne pas anticiper) : extraits audio dans le navigateur, partage/commentaires, page Discover,

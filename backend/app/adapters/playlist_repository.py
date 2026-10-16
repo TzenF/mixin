@@ -22,6 +22,14 @@ class PlaylistRow:
 
 
 @dataclass(frozen=True, slots=True)
+class ExportRow:
+    """Lien entre une de nos playlists et sa copie exportée chez un service musical."""
+
+    external_playlist_id: str
+    last_synced_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
 class TransitionRow:
     """Enchaînement d'un morceau vers le suivant (voir la fonction SQL transition)."""
 
@@ -260,3 +268,38 @@ class PlaylistRepository:
             )
             for r in rows
         ]
+
+    async def external_track_ids(self, playlist_id: UUID, provider: str) -> list[str | None]:
+        """Identifiant de chaque morceau chez ce service, dans l'ordre (None s'il n'y en a pas)."""
+        rows = await self._db.fetch_all(
+            """SELECT e.external_id
+               FROM playlist_item pi
+               LEFT JOIN track_external_id e
+                      ON e.track_id = pi.track_id AND e.provider = %(provider)s::music_provider
+               WHERE pi.playlist_id = %(id)s
+               ORDER BY pi.position""",
+            {"id": playlist_id, "provider": provider},
+        )
+        return [r["external_id"] for r in rows]
+
+    async def get_export(self, playlist_id: UUID, provider: str) -> ExportRow | None:
+        """Dernier export de la playlist vers ce service, ou None."""
+        row = await self._db.fetch_one(
+            """SELECT external_playlist_id, last_synced_at FROM playlist_export
+               WHERE playlist_id = %(id)s AND provider = %(provider)s::music_provider""",
+            {"id": playlist_id, "provider": provider},
+        )
+        return ExportRow(**row) if row else None
+
+    async def save_export(self, playlist_id: UUID, provider: str, external_playlist_id: str) -> ExportRow:
+        """Enregistre (ou met à jour) l'export de la playlist vers ce service."""
+        row = await self._db.fetch_one(
+            """INSERT INTO playlist_export (playlist_id, provider, external_playlist_id)
+               VALUES (%(id)s, %(provider)s::music_provider, %(ext)s)
+               ON CONFLICT (playlist_id, provider) DO UPDATE
+                   SET external_playlist_id = EXCLUDED.external_playlist_id, last_synced_at = now()
+               RETURNING external_playlist_id, last_synced_at""",
+            {"id": playlist_id, "provider": provider, "ext": external_playlist_id},
+        )
+        assert row is not None
+        return ExportRow(**row)

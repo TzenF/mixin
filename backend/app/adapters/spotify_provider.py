@@ -21,7 +21,10 @@ from app.domain.music_provider import (
 )
 
 API = "https://api.spotify.com/v1"
+WEB = "https://open.spotify.com"
 PAGE_SIZE = 50
+# Maximum de morceaux par requête d'ajout ou de remplacement (documentation vérifiée le 16/10/2026).
+WRITE_BATCH = 100
 MAX_ITEMS = 10_000  # garde-fou : une playlist Spotify en contient au plus 10 000
 
 
@@ -81,20 +84,52 @@ class SpotifyProvider:
         """Titres likés : pas encore implémenté (hors périmètre de l'import de playlists)."""
         raise NotImplementedError("Import des titres likés : prévu à une étape ultérieure")
 
-    async def create_playlist(self, access_token: str, name: str, track_ids: list[str]) -> str:
-        """Création de playlist : pas encore implémentée (étape export)."""
-        raise NotImplementedError("Export vers Spotify : prévu à l'étape export")
+    async def create_playlist(
+        self, access_token: str, name: str, description: str, track_ids: list[str]
+    ) -> str:
+        """Crée une playlist privée (POST /me/playlists) puis y ajoute les morceaux par lots de 100."""
+        created = await self._call(
+            access_token,
+            "POST",
+            f"{API}/me/playlists",
+            {"name": name, "public": False, "description": description},
+        )
+        playlist_id = str(created["id"])
+        for batch in _batches(track_ids):
+            await self._call(
+                access_token, "POST", f"{API}/playlists/{playlist_id}/items", {"uris": _uris(batch)}
+            )
+        return playlist_id
+
+    async def replace_playlist_items(self, access_token: str, playlist_id: str, track_ids: list[str]) -> None:
+        """Remplace le contenu (PUT des 100 premiers ; liste vide = vider), puis ajoute la suite (POST)."""
+        first, *rest = _batches(track_ids) or [[]]
+        await self._call(access_token, "PUT", f"{API}/playlists/{playlist_id}/items", {"uris": _uris(first)})
+        for batch in rest:
+            await self._call(
+                access_token, "POST", f"{API}/playlists/{playlist_id}/items", {"uris": _uris(batch)}
+            )
+
+    def playlist_url(self, playlist_id: str) -> str:
+        """Adresse de la playlist dans le lecteur web de Spotify."""
+        return f"{WEB}/playlist/{playlist_id}"
 
     async def _get(self, access_token: str, url: str) -> dict[str, Any]:
         """Appelle un endpoint GET et renvoie sa réponse JSON."""
+        return await self._call(access_token, "GET", url)
+
+    async def _call(
+        self, access_token: str, method: str, url: str, body: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Appelle la Web API ; lève SpotifyApiError si la réponse n'est pas un succès (2xx)."""
         headers = {"Authorization": f"Bearer {access_token}"}
         try:
-            resp = await request_with_retry(self._client, "GET", url, headers=headers)
+            resp = await request_with_retry(self._client, method, url, headers=headers, json=body)
         except httpx.HTTPError as e:
             raise MusicProviderError(f"Spotify injoignable : {e}") from e
-        if resp.status_code != 200:
+        if not 200 <= resp.status_code < 300:
             raise SpotifyApiError(resp.status_code, resp.text[:200])
-        return resp.json()
+        return resp.json() if resp.content else {}
 
     async def _paginate(self, access_token: str, url: str | None) -> list[dict[str, Any]]:
         """Suit les liens `next` et renvoie tous les éléments de toutes les pages."""
@@ -125,3 +160,13 @@ def _to_track(entry: dict[str, Any]) -> ProviderTrack:
         duration_ms=item.get("duration_ms") or None,
         isrc=((item.get("external_ids") or {}).get("isrc") or "").upper() or None,
     )
+
+
+def _batches(track_ids: list[str]) -> list[list[str]]:
+    """Découpe la liste en lots de WRITE_BATCH morceaux au plus, dans l'ordre."""
+    return [track_ids[i : i + WRITE_BATCH] for i in range(0, len(track_ids), WRITE_BATCH)]
+
+
+def _uris(track_ids: list[str]) -> list[str]:
+    """URI Spotify des morceaux (spotify:track:<id>)."""
+    return [f"spotify:track:{t}" for t in track_ids]

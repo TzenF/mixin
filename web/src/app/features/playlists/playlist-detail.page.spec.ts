@@ -47,6 +47,7 @@ const PLAYLIST: PlaylistDetail = {
   source_provider: null,
   track_count: 3,
   updated_at: '2026-10-16T14:00:00Z',
+  spotify_export: null,
   items: [
     { item_id: 1, position: 0, track: TRACK, transition_to_next: GOOD },
     {
@@ -291,5 +292,66 @@ describe('PlaylistDetailPage', () => {
     expect(dropList.disabled).toBe(true);
     expect(all(fixture, 'remove-item').length).toBe(0);
     expect((fixture.nativeElement as HTMLElement).querySelector('.handle')).toBeNull();
+  });
+
+  it('exporte vers Spotify et affiche le bilan et le lien', async () => {
+    const fixture = await render((req) => req.flush(PLAYLIST));
+    const button = all(fixture, 'export-spotify')[0] as HTMLButtonElement;
+    expect(button.textContent).toContain('Exporter vers Spotify');
+
+    button.click();
+    fixture.detectChanges();
+    expect(button.disabled).toBe(true);
+    const req = http.expectOne('/api/playlists/set/export/spotify');
+    expect(req.request.method).toBe('POST');
+    req.flush({
+      url: 'https://open.spotify.com/playlist/sp1',
+      created: true,
+      exported: 2,
+      skipped: 1,
+      exported_at: '2026-10-16T15:00:00Z',
+    });
+    await fixture.whenStable();
+
+    const result = all(fixture, 'export-result')[0].textContent ?? '';
+    expect(result).toContain('Playlist créée sur Spotify');
+    expect(result).toContain('2 titres');
+    expect(result).toContain('1 ignoré (pas sur Spotify)');
+    expect(all(fixture, 'open-spotify')[0].getAttribute('href')).toBe(
+      'https://open.spotify.com/playlist/sp1',
+    );
+    expect(button.textContent).toContain('Mettre à jour sur Spotify');
+  });
+
+  it("propose « Mettre à jour » si elle est déjà exportée, et n'exporte pas une importée", async () => {
+    const exported = await render((req) =>
+      req.flush({
+        ...PLAYLIST,
+        spotify_export: {
+          url: 'https://open.spotify.com/playlist/sp1',
+          exported_at: '2026-10-16T15:00:00Z',
+        },
+      }),
+    );
+    expect(all(exported, 'export-spotify')[0].textContent).toContain('Mettre à jour sur Spotify');
+    expect(all(exported, 'spotify-export')[0].textContent).toContain('Exportée le 16/10/2026');
+
+    const imported = await render((req) => req.flush({ ...PLAYLIST, source_provider: 'spotify' }));
+    expect(all(imported, 'export-spotify').length).toBe(0);
+  });
+
+  it("affiche l'erreur Spotify sans quitter la page (session Spotify expirée)", async () => {
+    const fixture = await render((req) => req.flush(PLAYLIST));
+    all(fixture, 'export-spotify')[0].click();
+    http
+      .expectOne('/api/playlists/set/export/spotify')
+      .flush(
+        { detail: 'Session Spotify expirée : reconnecte-toi' },
+        { status: 401, statusText: '' },
+      );
+    await fixture.whenStable();
+
+    expect(all(fixture, 'action-error')[0].textContent).toContain('reconnecte-toi');
+    expect(all(fixture, 'item').length).toBe(3);
   });
 });

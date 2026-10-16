@@ -37,9 +37,26 @@ export interface PlaylistItem {
   transition_to_next: Transition | null;
 }
 
-/** Une playlist avec ses morceaux dans l'ordre. */
+/** Dernier export d'une playlist vers Spotify. */
+export interface SpotifyExport {
+  url: string;
+  exported_at: string;
+}
+
+/** Une playlist avec ses morceaux dans l'ordre ; spotify_export null = jamais exportée. */
 export interface PlaylistDetail extends PlaylistSummary {
   items: PlaylistItem[];
+  spotify_export: SpotifyExport | null;
+}
+
+/** Bilan d'un export : created = nouvelle playlist chez Spotify (sinon : mise à jour de la précédente). */
+export interface ExportOutcome {
+  url: string;
+  created: boolean;
+  exported: number;
+  /** Morceaux absents de Spotify (sans identifiant Spotify). */
+  skipped: number;
+  exported_at: string;
 }
 
 /** Élément ajouté à une playlist. */
@@ -106,6 +123,14 @@ export class PlaylistService {
   removeItem(playlistId: string, itemId: number): Observable<void> {
     return this.http.delete<void>(
       `/api/playlists/${encodeURIComponent(playlistId)}/items/${itemId}`,
+    );
+  }
+
+  /** Exporte la playlist vers Spotify (privée) ou met à jour l'export précédent ; 409 si elle est importée. */
+  exportToSpotify(playlistId: string): Observable<ExportOutcome> {
+    return this.http.post<ExportOutcome>(
+      `/api/playlists/${encodeURIComponent(playlistId)}/export/spotify`,
+      null,
     );
   }
 }

@@ -18,6 +18,7 @@ function detail(id: string, trackIds: string[]): PlaylistDetail {
   return {
     ...MINE,
     id,
+    spotify_export: null,
     items: trackIds.map((trackId, position) => ({
       item_id: position,
       position,

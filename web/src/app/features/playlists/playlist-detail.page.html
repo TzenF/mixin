@@ -60,6 +60,22 @@
           </button>
         }
       }
+      @if (playlist.source_provider === null) {
+        <button
+          type="button"
+          [disabled]="exporting() || playlist.items.length === 0"
+          (click)="exportToSpotify()"
+          data-testid="export-spotify"
+        >
+          {{
+            exporting()
+              ? 'Export…'
+              : playlist.spotify_export
+                ? 'Mettre à jour sur Spotify'
+                : 'Exporter vers Spotify'
+          }}
+        </button>
+      }
       <button type="button" class="secondary" (click)="duplicate()" data-testid="duplicate">
         {{ playlist.source_provider === null ? 'Dupliquer' : 'Dupliquer pour modifier' }}
       </button>
@@ -69,6 +85,23 @@
     </p>
     @if (actionError(); as message) {
       <p class="error" data-testid="action-error">{{ message }}</p>
+    }
+    @if (exportOutcome(); as o) {
+      <p class="result" data-testid="export-result">
+        {{ o.created ? 'Playlist créée sur Spotify' : 'Playlist mise à jour sur Spotify' }} :
+        {{ o.exported }} titre{{ o.exported > 1 ? 's' : '' }}
+        @if (o.skipped > 0) {
+          · {{ o.skipped }} ignoré{{ o.skipped > 1 ? 's' : '' }} (pas sur Spotify)
+        }
+      </p>
+    }
+    @if (playlist.spotify_export; as e) {
+      <p class="hint" data-testid="spotify-export">
+        Exportée le {{ e.exported_at | date: "dd/MM/yyyy 'à' HH:mm" }} ·
+        <a [href]="e.url" target="_blank" rel="noopener" data-testid="open-spotify"
+          >Ouvrir dans Spotify</a
+        >
+      </p>
     }
     <p class="hint" data-testid="summary">
       {{ playlist.items.length }} titre{{ playlist.items.length > 1 ? 's' : '' }} ·

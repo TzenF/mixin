@@ -1,5 +1,6 @@
 """Adaptateur Spotify testé contre une fausse API (httpx.MockTransport) : aucun appel réseau."""
 
+import json
 from collections.abc import Callable
 from typing import Any
 
@@ -150,3 +151,64 @@ async def test_does_not_send_the_token_to_a_foreign_next_link() -> None:
     with pytest.raises(MusicProviderError, match="lien de page inattendu"):
         await provider.get_user_playlists("jeton")
     assert set(hosts) == {"api.spotify.com"}
+
+
+def _recording_api(created_id: str = "new") -> tuple[SpotifyProvider, list[tuple[str, str, Any]]]:
+    """Fausse API qui note chaque appel (méthode, chemin, corps JSON) et accepte les écritures."""
+    calls: list[tuple[str, str, Any]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        """Enregistre l'appel puis répond comme Spotify."""
+        body = json.loads(request.content) if request.content else None
+        calls.append((request.method, request.url.path, body))
+        if request.method == "POST" and request.url.path == "/v1/me/playlists":
+            return httpx.Response(201, json={"id": created_id})
+        return httpx.Response(201 if request.method == "POST" else 200, json={"snapshot_id": "s"})
+
+    return SpotifyProvider(httpx.AsyncClient(transport=httpx.MockTransport(handler))), calls
+
+
+async def test_create_playlist_is_private_and_adds_tracks_by_batches_of_100() -> None:
+    provider, calls = _recording_api(created_id="pl1")
+    ids = [f"t{i}" for i in range(250)]
+
+    assert await provider.create_playlist("jeton", "Set", "Exportée", ids) == "pl1"
+
+    assert calls[0] == (
+        "POST",
+        "/v1/me/playlists",
+        {"name": "Set", "public": False, "description": "Exportée"},
+    )
+    adds = calls[1:]
+    assert [(m, p) for m, p, _ in adds] == [("POST", "/v1/playlists/pl1/items")] * 3
+    assert [len(b["uris"]) for _, _, b in adds] == [100, 100, 50]
+    assert adds[0][2]["uris"][0] == "spotify:track:t0"
+    assert adds[2][2]["uris"][-1] == "spotify:track:t249"  # l'ordre est conservé
+
+
+async def test_replace_puts_the_first_100_then_appends_the_rest() -> None:
+    provider, calls = _recording_api()
+
+    await provider.replace_playlist_items("jeton", "pl1", [f"t{i}" for i in range(150)])
+
+    assert [(m, p, len(b["uris"])) for m, p, b in calls] == [
+        ("PUT", "/v1/playlists/pl1/items", 100),
+        ("POST", "/v1/playlists/pl1/items", 50),
+    ]
+
+
+async def test_replace_with_no_track_empties_the_playlist() -> None:
+    provider, calls = _recording_api()
+    await provider.replace_playlist_items("jeton", "pl1", [])
+    assert calls == [("PUT", "/v1/playlists/pl1/items", {"uris": []})]
+
+
+async def test_write_error_is_reported() -> None:
+    provider = _api({"/v1/me/playlists": lambda _req: httpx.Response(403, json={"error": "forbidden"})})
+    with pytest.raises(SpotifyApiError) as exc:
+        await provider.create_playlist("jeton", "Set", "", [])
+    assert exc.value.status_code == 403
+
+
+def test_playlist_url() -> None:
+    assert SpotifyProvider(httpx.AsyncClient()).playlist_url("abc") == "https://open.spotify.com/playlist/abc"

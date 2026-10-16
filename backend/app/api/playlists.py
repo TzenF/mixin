@@ -9,9 +9,19 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, StringConstraints
 
 from app.adapters.playlist_repository import PlaylistRepository
-from app.api.deps import get_current_user_id, get_playlist_editor, get_playlist_repository
+from app.adapters.spotify_provider import SpotifyProvider
+from app.api.deps import (
+    get_current_user_id,
+    get_playlist_editor,
+    get_playlist_exporter,
+    get_playlist_repository,
+    get_spotify_connection,
+    get_spotify_provider,
+)
 from app.api.tracks import DEFAULT_BPM_TOLERANCE, CatalogTrack
 from app.services.playlist_editor import PlaylistEditor
+from app.services.playlist_export import PlaylistExporter
+from app.services.spotify_connection import SpotifyConnection
 
 router = APIRouter(prefix="/playlists", tags=["playlists"])
 
@@ -55,10 +65,18 @@ class PlaylistItem(BaseModel):
     transition_to_next: Transition | None
 
 
+class SpotifyExport(BaseModel):
+    """Dernier export de la playlist vers Spotify."""
+
+    url: str
+    exported_at: datetime
+
+
 class PlaylistDetail(PlaylistSummary):
-    """Une playlist avec ses morceaux dans l'ordre."""
+    """Une playlist avec ses morceaux dans l'ordre ; spotify_export null = jamais exportée."""
 
     items: list[PlaylistItem]
+    spotify_export: SpotifyExport | None
 
 
 @router.get("")
@@ -68,13 +86,29 @@ async def list_playlists(playlists: Playlists, user_id: CurrentUser) -> list[Pla
 
 
 @router.get("/{playlist_id}")
-async def get_playlist(playlist_id: UUID, playlists: Playlists, user_id: CurrentUser) -> PlaylistDetail:
+async def get_playlist(
+    playlist_id: UUID,
+    playlists: Playlists,
+    user_id: CurrentUser,
+    spotify: Annotated[SpotifyProvider, Depends(get_spotify_provider)],
+) -> PlaylistDetail:
     """Une de mes playlists, avec l'enchaînement entre chaque morceau ; 404 si elle n'est pas à moi."""
     playlist = await playlists.get_for_owner(user_id, playlist_id)
     if playlist is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Playlist inconnue")
     items = await playlists.items_with_transitions(user_id, playlist_id, DEFAULT_BPM_TOLERANCE)
-    return PlaylistDetail(**asdict(playlist), items=[PlaylistItem(**asdict(i)) for i in items])
+    export = await playlists.get_export(playlist_id, spotify.name)
+    return PlaylistDetail(
+        **asdict(playlist),
+        items=[PlaylistItem(**asdict(i)) for i in items],
+        spotify_export=(
+            SpotifyExport(
+                url=spotify.playlist_url(export.external_playlist_id), exported_at=export.last_synced_at
+            )
+            if export
+            else None
+        ),
+    )
 
 
 class PlaylistNameIn(BaseModel):
@@ -150,3 +184,31 @@ async def remove_item(playlist_id: UUID, item_id: int, editor: Editor, user_id: 
     """Retire un morceau de la playlist ; 404 s'il n'y est pas."""
     await editor.remove_item(user_id, playlist_id, item_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+class ExportOutcome(BaseModel):
+    """Bilan d'un export : created = nouvelle playlist chez Spotify (sinon : mise à jour de la précédente)."""
+
+    url: str
+    created: bool
+    exported: int
+    skipped: int
+    exported_at: datetime
+
+
+@router.post("/{playlist_id}/export/spotify")
+async def export_to_spotify(
+    playlist_id: UUID,
+    user_id: CurrentUser,
+    connection: Annotated[SpotifyConnection, Depends(get_spotify_connection)],
+    exporter: Annotated[PlaylistExporter, Depends(get_playlist_exporter)],
+) -> ExportOutcome:
+    """Exporte la playlist vers Spotify (privée) ou met à jour l'export précédent ; 409 si importée."""
+    result = await exporter.export(user_id, playlist_id, await connection.access_token(user_id))
+    return ExportOutcome(
+        url=result.url,
+        created=result.created,
+        exported=result.exported,
+        skipped=result.skipped,
+        exported_at=result.exported_at,
+    )

@@ -5,7 +5,7 @@ import {
   CdkDropList,
   moveItemInArray,
 } from '@angular/cdk/drag-drop';
-import { DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -13,6 +13,7 @@ import { apiErrorMessage } from '../../core/api/api-error';
 import { SPOTIFY_LOGIN_URL } from '../../core/api/auth.service';
 import { CatalogTrack } from '../../core/api/catalog.service';
 import {
+  ExportOutcome,
   PlaylistDetail,
   PlaylistItem,
   PlaylistService,
@@ -37,7 +38,7 @@ export interface TransitionView {
 /** Page « Playlist » : morceaux dans l'ordre et qualité de chaque enchaînement. */
 @Component({
   selector: 'app-playlist-detail-page',
-  imports: [DecimalPipe, CdkDropList, CdkDrag, CdkDragHandle],
+  imports: [DatePipe, DecimalPipe, CdkDropList, CdkDrag, CdkDragHandle],
   templateUrl: './playlist-detail.page.html',
   styleUrl: './playlist-detail.page.scss',
 })
@@ -51,6 +52,10 @@ export class PlaylistDetailPage {
   protected readonly state = signal<State>({ kind: 'loading' });
   /** Vrai pendant la modification du nom. */
   protected readonly renaming = signal(false);
+  /** Vrai pendant l'export vers Spotify. */
+  protected readonly exporting = signal(false);
+  /** Bilan du dernier export fait depuis cette page, ou null. */
+  protected readonly exportOutcome = signal<ExportOutcome | null>(null);
   /** Échec de la dernière action (renommer, dupliquer, supprimer), ou null. */
   protected readonly actionError = signal<string | null>(null);
 
@@ -177,6 +182,35 @@ export class PlaylistDetailPage {
         }
       },
       error: (err: HttpErrorResponse) => this.fail(err, 'Impossible de retirer ce morceau.'),
+    });
+  }
+
+  /** Exporte la playlist vers Spotify, ou met à jour l'export précédent. */
+  protected exportToSpotify(): void {
+    this.exporting.set(true);
+    this.actionError.set(null);
+    this.exportOutcome.set(null);
+    this.service.exportToSpotify(this.playlistId).subscribe({
+      next: (outcome) => {
+        this.exporting.set(false);
+        this.exportOutcome.set(outcome);
+        this.state.update((s) =>
+          s.kind === 'ready'
+            ? {
+                ...s,
+                playlist: {
+                  ...s.playlist,
+                  spotify_export: { url: outcome.url, exported_at: outcome.exported_at },
+                },
+              }
+            : s,
+        );
+      },
+      error: (err: HttpErrorResponse) => {
+        this.exporting.set(false);
+        // Ici, un 401 vient de Spotify (jeton expiré ou révoqué) : on affiche le message, sans quitter la page.
+        this.actionError.set(apiErrorMessage(err, "L'export vers Spotify a échoué."));
+      },
     });
   }
 
