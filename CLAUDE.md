@@ -72,6 +72,7 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Requêtes SQL | `app/adapters/db.py` → `Database.fetch_all` / `fetch_one` (depuis un dépôt uniquement) |
 | Plusieurs écritures atomiques | `Database.transaction()` → objet `Transaction` ; les dépôts acceptent un `Queryable` (base ou transaction) |
 | Morceaux en base | `app/adapters/track_repository.py` → `TrackRepository` (dont `find_by_isrc`, `find_by_external_id`, `set_artists`) |
+| Catalogue filtré (mes morceaux ou tous) | `TrackRepository.catalog(user, CatalogFilters)` ; route `GET /tracks` |
 | Utilisateurs, comptes musicaux | `app/adapters/user_repository.py` → `UserRepository` |
 | Sessions de connexion | `app/services/sessions.py` → `SessionService` (dépôt : `SessionRepository`) |
 | Playlists en base | `app/adapters/playlist_repository.py` → `PlaylistRepository` |
@@ -92,9 +93,10 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Erreur de service musical → HTTP | `app/api/errors.py` (404 / 401 / 502, déjà branché) |
 | Valeur BPM/tonalité à afficher | SQL `effective_features(user)` |
 | Morceaux compatibles | SQL `suggest_tracks(user, seed, tolerance, limit)` |
-| Styles | `web/src/styles/_tokens.scss`, `_mixins.scss` (`page`, `panel`, `status`, `reset-list`, `button-primary`, `focus-ring`, `text-muted`, `text-danger`) |
+| Styles | `web/src/styles/_tokens.scss`, `_mixins.scss` (`page`, `panel`, `status`, `reset-list`, `button-primary`, `button-secondary`, `focus-ring`, `text-muted`, `text-danger`) |
 | Message d'erreur d'API (front) | `web/src/app/core/api/api-error.ts` → `apiErrorMessage` |
 | Session côté front | `web/src/app/core/api/auth.service.ts` → `AuthService`, `SPOTIFY_LOGIN_URL` |
+| Catalogue côté front | `web/src/app/core/api/catalog.service.ts` → `CatalogService` (types `CatalogTrack`, `AnalysisStatus`) |
 
 Tenir ce tableau à jour quand on ajoute un élément réutilisable.
 
