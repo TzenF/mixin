@@ -121,6 +121,29 @@
   }
 }
 
+/// Carte cliquable pleine largeur (un <button> qui ouvre ou enchaîne quelque chose).
+@mixin card-button {
+  @include panel;
+  @include focus-ring;
+  width: 100%;
+  border: t.$border-width solid var(--color-border);
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--color-primary);
+  }
+}
+
+/// Petite étiquette en ligne (statut, source…) ; la couleur vient de `status` ou `text-muted`.
+@mixin badge {
+  padding: 0 t.$space-2;
+  border-radius: t.$radius-sm;
+  white-space: nowrap;
+}
+
 /// Texte secondaire, moins contrasté.
 @mixin text-muted {
   color: var(--color-text-muted);

@@ -15,6 +15,11 @@ const LINKS: HomeLink[] = [
     description: 'Mes morceaux avec BPM et tonalité ; bouton « Suggestions » pour enchaîner',
   },
   {
+    path: '/playlists',
+    label: 'Playlists',
+    description: 'Mes playlists et la qualité de chaque enchaînement',
+  },
+  {
     path: '/spotify',
     label: 'Mes playlists Spotify',
     description: 'Connexion à Spotify et import des playlists',

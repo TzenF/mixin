@@ -13,6 +13,6 @@ describe('HomePage', () => {
     const hrefs = Array.from(root.querySelectorAll('[data-testid="home-links"] a')).map((a) =>
       a.getAttribute('href'),
     );
-    expect(hrefs).toEqual(['/catalog', '/spotify', '/status']);
+    expect(hrefs).toEqual(['/catalog', '/playlists', '/spotify', '/status']);
   });
 });

@@ -1,0 +1,49 @@
+@use 'mixins' as m;
+@use 'tokens' as t;
+
+main {
+  @include m.page(t.$width-narrow);
+}
+
+.hint,
+.meta {
+  @include m.text-muted;
+}
+
+.error {
+  @include m.text-danger;
+}
+
+ul {
+  @include m.reset-list;
+}
+
+li {
+  margin-bottom: t.$space-2;
+}
+
+button.playlist {
+  @include m.card-button;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.name {
+  font-weight: t.$font-weight-bold;
+}
+
+.meta {
+  font-size: t.$font-size-sm;
+}
+
+.badge {
+  @include m.badge;
+  @include m.status(success);
+  margin-left: t.$space-2;
+}
+
+button:not(.playlist),
+.button {
+  @include m.button-primary;
+}

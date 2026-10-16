@@ -2,9 +2,86 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, fields
+from datetime import datetime
 from uuid import UUID
 
 from app.adapters.db import Queryable
+from app.adapters.track_repository import TRACK_COLUMNS_SQL, CatalogRow
+
+
+@dataclass(frozen=True, slots=True)
+class PlaylistRow:
+    """Une playlist ; source_provider est None pour une playlist créée dans l'application."""
+
+    id: UUID
+    name: str
+    source_provider: str | None
+    track_count: int
+    updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class TransitionRow:
+    """Enchaînement d'un morceau vers le suivant (voir la fonction SQL transition)."""
+
+    key_move: str | None
+    key_distance: int
+    half_double: bool
+    bpm_diff: float
+    bpm_change: float
+    tempo_ok: bool  # écart de BPM dans la tolérance (le reste vient de la tonalité)
+    same_mode: bool  # même lettre Camelot (mineur/mineur ou majeur/majeur)
+    compatible: bool
+
+
+@dataclass(frozen=True, slots=True)
+class PlaylistItemRow:
+    """Un morceau de la playlist, et son enchaînement vers le suivant (None : dernier, ou non analysé)."""
+
+    item_id: int
+    position: int
+    track: CatalogRow
+    transition_to_next: TransitionRow | None
+
+
+_PLAYLIST_SQL = """
+SELECT p.id, p.name, p.source_provider::text AS source_provider, p.updated_at,
+       (SELECT count(*) FROM playlist_item pi WHERE pi.playlist_id = p.id)::integer AS track_count
+FROM playlist p
+WHERE p.owner_id = %(owner)s::uuid
+"""
+
+# Morceaux dans l'ordre, valeurs affichées pour l'utilisateur, et enchaînement vers le suivant (LEAD).
+_ITEMS_SQL = f"""
+WITH items AS (
+    SELECT pi.id AS item_id, pi.position, {TRACK_COLUMNS_SQL},
+           f.bpm AS raw_bpm, f.camelot_num AS raw_num, f.camelot_letter::text AS raw_letter
+    FROM playlist_item pi
+    JOIN track t ON t.id = pi.track_id
+    LEFT JOIN effective_features(%(owner)s::uuid) f ON f.track_id = t.id
+    WHERE pi.playlist_id = %(playlist_id)s::uuid
+),
+paired AS (
+    SELECT items.*,
+           LEAD(raw_bpm) OVER w AS next_bpm,
+           LEAD(raw_num) OVER w AS next_num,
+           LEAD(raw_letter) OVER w AS next_letter
+    FROM items
+    WINDOW w AS (ORDER BY position)
+)
+SELECT p.*, tr.key_move, tr.key_distance, tr.half_double,
+       tr.bpm_diff::float AS bpm_diff, tr.bpm_change::float AS bpm_change,
+       tr.bpm_diff <= %(tolerance)s::numeric AS tempo_ok, p.raw_letter = p.next_letter AS same_mode,
+       tr.compatible
+FROM paired p
+LEFT JOIN LATERAL transition(p.raw_bpm, p.raw_num, p.raw_letter,
+                             p.next_bpm, p.next_num, p.next_letter, %(tolerance)s::numeric) tr ON true
+ORDER BY p.position
+"""
+
+_TRACK_FIELDS = [f.name for f in fields(CatalogRow)]
+_TRANSITION_FIELDS = [f.name for f in fields(TransitionRow)]
 
 
 class PlaylistRepository:
@@ -69,3 +146,39 @@ class PlaylistRepository:
             {"id": playlist_id},
         )
         return [r["track_id"] for r in rows]
+
+    async def list_for_owner(self, owner_id: UUID) -> list[PlaylistRow]:
+        """Playlists de l'utilisateur, les plus récemment modifiées d'abord."""
+        rows = await self._db.fetch_all(
+            f"{_PLAYLIST_SQL} ORDER BY p.updated_at DESC, lower(p.name)", {"owner": owner_id}
+        )
+        return [PlaylistRow(**r) for r in rows]
+
+    async def get_for_owner(self, owner_id: UUID, playlist_id: UUID) -> PlaylistRow | None:
+        """La playlist si elle appartient à cet utilisateur, sinon None (même si elle existe)."""
+        row = await self._db.fetch_one(
+            f"{_PLAYLIST_SQL} AND p.id = %(playlist_id)s::uuid",
+            {"owner": owner_id, "playlist_id": playlist_id},
+        )
+        return PlaylistRow(**row) if row else None
+
+    async def items_with_transitions(
+        self, owner_id: UUID, playlist_id: UUID, bpm_tolerance: float
+    ) -> list[PlaylistItemRow]:
+        """Morceaux dans l'ordre (valeurs vues par le propriétaire) et enchaînement vers le suivant."""
+        rows = await self._db.fetch_all(
+            _ITEMS_SQL, {"owner": owner_id, "playlist_id": playlist_id, "tolerance": bpm_tolerance}
+        )
+        return [
+            PlaylistItemRow(
+                item_id=r["item_id"],
+                position=r["position"],
+                track=CatalogRow(**{k: r[k] for k in _TRACK_FIELDS}),
+                transition_to_next=(
+                    TransitionRow(**{k: r[k] for k in _TRANSITION_FIELDS})
+                    if r["key_distance"] is not None
+                    else None
+                ),
+            )
+            for r in rows
+        ]

@@ -28,7 +28,7 @@ export interface CatalogPage {
 }
 
 /** Type d'enchaînement de tonalité (roue Camelot). */
-export type KeyMove = 'same' | 'adjacent' | 'relative' | 'energy_shift';
+export type KeyMove = 'same' | 'adjacent' | 'relative' | 'diagonal' | 'energy_shift';
 
 /** Un morceau qui s'enchaîne bien après le morceau de départ (voir backend/app/api/tracks.py). */
 export interface Suggestion {

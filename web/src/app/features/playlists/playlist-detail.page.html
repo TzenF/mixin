@@ -1,0 +1,69 @@
+<main>
+  <p>
+    <button type="button" class="secondary" (click)="backToList()" data-testid="back">
+      ← Playlists
+    </button>
+  </p>
+
+  @switch (state().kind) {
+    @case ('loading') {
+      <p class="hint" data-testid="loading">Chargement…</p>
+    }
+    @case ('disconnected') {
+      <p class="hint">Connecte-toi avec Spotify pour voir cette playlist.</p>
+      <a class="button" [href]="loginUrl" data-testid="connect-spotify">Connecter Spotify</a>
+    }
+    @case ('not_found') {
+      <p class="error" data-testid="not-found">Cette playlist n'existe pas.</p>
+    }
+    @case ('error') {
+      <p class="error" data-testid="error">{{ errorMessage() }}</p>
+      <button type="button" (click)="load()">Réessayer</button>
+    }
+  }
+
+  @if (playlist(); as playlist) {
+    <h1>{{ playlist.name }}</h1>
+    <p class="hint" data-testid="summary">
+      {{ playlist.items.length }} titre{{ playlist.items.length > 1 ? 's' : '' }} ·
+      {{ counts().warn }} enchaînement{{ counts().warn > 1 ? 's' : '' }} ⚠
+      @if (counts().unknown > 0) {
+        · {{ counts().unknown }} inconnu{{ counts().unknown > 1 ? 's' : '' }}
+      }
+      @if (playlist.source_provider === 'spotify') {
+        · <span class="badge" data-testid="imported">Importée de Spotify : lecture seule</span>
+      }
+    </p>
+
+    @if (playlist.items.length === 0) {
+      <p class="hint" data-testid="empty">Cette playlist est vide.</p>
+    } @else {
+      <ol data-testid="items">
+        @for (row of rows(); track row.item.item_id; let i = $index) {
+          <li class="track" data-testid="item">
+            <span class="index">{{ i + 1 }}</span>
+            <span class="what">
+              <span class="title">{{ row.item.track.title }}</span>
+              <span class="hint">{{ row.item.track.artists.join(', ') }}</span>
+            </span>
+            <span class="values">
+              {{ row.item.track.bpm === null ? '—' : (row.item.track.bpm | number: '1.1-1') }} BPM ·
+              {{ row.item.track.camelot ?? '—' }}
+            </span>
+            <button
+              type="button"
+              class="secondary"
+              (click)="openSuggestions(row.item.track)"
+              data-testid="open-suggestions"
+            >
+              Suggestions
+            </button>
+          </li>
+          @if (row.transition; as t) {
+            <li [class]="'transition ' + t.kind" data-testid="transition">{{ t.text }}</li>
+          }
+        }
+      </ol>
+    }
+  }
+</main>

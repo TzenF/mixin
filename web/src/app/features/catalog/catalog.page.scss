@@ -45,9 +45,7 @@ th {
 }
 
 .badge {
-  padding: 0 t.$space-2;
-  border-radius: t.$radius-sm;
-  white-space: nowrap;
+  @include m.badge;
 
   &.done {
     @include m.status(success);

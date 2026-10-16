@@ -19,6 +19,8 @@ router = APIRouter(prefix="/tracks", tags=["tracks"])
 Tracks = Annotated[TrackRepository, Depends(get_track_repository)]
 CurrentUser = Annotated[UUID, Depends(get_current_user_id)]
 AnalysisStatus = Literal["pending", "done", "no_preview", "failed"]
+# Écart de BPM accepté par défaut entre deux morceaux (±6 %), comme la fonction SQL suggest_tracks.
+DEFAULT_BPM_TOLERANCE = 0.06
 
 
 class CatalogTrack(BaseModel):
@@ -104,7 +106,7 @@ async def suggestions(
     tracks: Tracks,
     user_id: CurrentUser,
     scope: Literal["mine", "all"] = "mine",
-    bpm_tolerance: Annotated[float, Query(gt=0, le=0.2)] = 0.06,
+    bpm_tolerance: Annotated[float, Query(gt=0, le=0.2)] = DEFAULT_BPM_TOLERANCE,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> list[Suggestion]:
     """Liste les morceaux (les miens, ou tous avec scope=all) qui s'enchaînent bien après `track_id`."""

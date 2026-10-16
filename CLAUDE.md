@@ -75,7 +75,7 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Catalogue filtré (mes morceaux ou tous) | `TrackRepository.catalog(user, CatalogFilters)` ; routes `GET /tracks`, `GET /tracks/{id}` (`CatalogFilters.track_id`) |
 | Utilisateurs, comptes musicaux | `app/adapters/user_repository.py` → `UserRepository` |
 | Sessions de connexion | `app/services/sessions.py` → `SessionService` (dépôt : `SessionRepository`) |
-| Playlists en base | `app/adapters/playlist_repository.py` → `PlaylistRepository` |
+| Playlists en base | `app/adapters/playlist_repository.py` → `PlaylistRepository` (dont `list_for_owner`, `get_for_owner`, `items_with_transitions`) ; routes `GET /playlists`, `GET /playlists/{id}` |
 | Journal des imports | `app/adapters/import_job_repository.py` → `ImportJobRepository` |
 | Appel HTTP vers une API externe | `app/adapters/http_retry.py` → `request_with_retry` (gère les 429 / `Retry-After`) |
 | Chiffrer un jeton avant stockage | `app/adapters/token_cipher.py` → `TokenCipher` (clé `TOKEN_ENCRYPTION_KEY`) |
@@ -93,11 +93,14 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Dépendances de route | `app/api/deps.py` → `get_db`, `get_queue`, `get_track_repository`, `get_current_user_id` (exige une session) |
 | Erreur de service musical → HTTP | `app/api/errors.py` (404 / 401 / 502, déjà branché) |
 | Valeur BPM/tonalité à afficher | SQL `effective_features(user)` |
+| Règle d'enchaînement entre deux morceaux | SQL `transition(a_bpm, a_num, a_letter, b_bpm, b_num, b_letter, tolerance)` (migrations 003–004) : utilisée par `suggest_tracks` et les playlists |
 | Morceaux compatibles | SQL `suggest_tracks(user, seed, tolerance, limit)`, via `TrackRepository.suggestions` (filtre « mes morceaux » appliqué avant la limite) |
 | SQL partagé du dépôt des morceaux | `track_repository.py` → `_ARTISTS_SQL` (artistes dans l'ordre), `_MINE_SQL` (« mes morceaux ») |
-| Styles | `web/src/styles/_tokens.scss`, `_mixins.scss` (`page`, `panel`, `status`, `reset-list`, `button-primary`, `button-secondary`, `icon-button`, `field`, `filter-bar`, `focus-ring`, `text-muted`, `text-danger`) |
+| Styles | `web/src/styles/_tokens.scss`, `_mixins.scss` (`page`, `panel`, `status`, `reset-list`, `button-primary`, `button-secondary`, `icon-button`, `card-button`, `badge`, `field`, `filter-bar`, `focus-ring`, `text-muted`, `text-danger`) |
 | Message d'erreur d'API (front) | `web/src/app/core/api/api-error.ts` → `apiErrorMessage` |
 | Session côté front | `web/src/app/core/api/auth.service.ts` → `AuthService`, `SPOTIFY_LOGIN_URL` |
+| Playlists côté front | `web/src/app/core/api/playlist.service.ts` → `PlaylistService` |
+| Libellés d'enchaînement, écart de BPM signé (front) | `web/src/app/shared/key-moves.ts` → `KEY_MOVE_LABELS`, `formatBpmChange` |
 | Catalogue côté front | `web/src/app/core/api/catalog.service.ts` → `CatalogService` (`tracks`, `track`, `suggestions`, `flipMode`) |
 
 Tenir ce tableau à jour quand on ajoute un élément réutilisable.
@@ -163,9 +166,15 @@ Ne pas reproposer ces alternatives sans élément nouveau.
   calculée à la lecture par `effective_features(user)` avec la priorité :
   correction perso > rekordbox perso > correction admin (globale) > Essentia.
 - Tonalité stockée en Camelot (`camelot_num` 1–12 + `camelot_letter` A=mineur / B=majeur).
+- **Règle d'enchaînement** (fonction SQL `transition`, seul endroit où elle est écrite) et score de tonalité :
+  même tonalité 1.00, ±1 cran 0.90, relative (même numéro, autre lettre) 0.85, **diagonale** (±1 cran et autre
+  lettre, acceptée le 16/10/2026 : une seule note change) 0.75, ±2 crans 0.50 ; tout le reste est refusé.
 
 Migrations : le dossier est monté dans `/docker-entrypoint-initdb.d`, donc **exécuté seulement sur un volume
-vide**. Nouveau fichier numéroté, puis `make reset-db` en dev.
+vide**. Nouveau fichier numéroté. Pour ne pas effacer les données de dev (`make reset-db` efface tout) : écrire la
+migration **idempotente** (`CREATE OR REPLACE`, `IF NOT EXISTS`) et l'appliquer avec
+`docker compose exec -T db psql -U dj -d dj -f /docker-entrypoint-initdb.d/00X_….sql`. Une fonction SQL
+réécrite se vérifie avant/après dans une transaction `REPEATABLE READ` (résultats identiques, sinon `ROLLBACK`).
 
 ## Pièges connus
 
@@ -197,6 +206,8 @@ vide**. Nouveau fichier numéroté, puis `make reset-db` en dev.
   `track.analysis_status`.
 - **Les tests utilisent la base Redis 15** (forcée dans `tests/conftest.py`) : le worker de dev, sur la
   base 0, n'exécute pas leurs tâches.
+- **Écart de BPM : `bpm_diff` (absolu, sert au score) ≠ `bpm_change` (signé en %, sert à l'affichage)**. Un
+  enchaînement refusé garde `key_distance` et `tempo_ok` / `same_mode` pour expliquer pourquoi.
 - **Les tests PostgreSQL tournent sur la base de dev** (choix assumé), qui contient de vrais morceaux
   analysés : un test ne vérifie que **ses propres lignes** (filtre sur ses ID ou son `test_prefix`), jamais
   « le résultat entier ».

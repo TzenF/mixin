@@ -8,6 +8,7 @@ from fastapi import Cookie, Depends, HTTPException, Request, status
 
 from app.adapters.db import Database
 from app.adapters.oauth_state_store import OAuthStateStore
+from app.adapters.playlist_repository import PlaylistRepository
 from app.adapters.queue import TaskQueue
 from app.adapters.spotify_auth import SpotifyAuth
 from app.adapters.spotify_provider import SpotifyProvider
@@ -44,6 +45,11 @@ def get_http_client(request: Request) -> httpx.AsyncClient:
 def get_track_repository(db: Annotated[Database, Depends(get_db)]) -> TrackRepository:
     """Fournit le dépôt des morceaux."""
     return TrackRepository(db)
+
+
+def get_playlist_repository(db: Annotated[Database, Depends(get_db)]) -> PlaylistRepository:
+    """Fournit le dépôt des playlists."""
+    return PlaylistRepository(db)
 
 
 def get_session_service(

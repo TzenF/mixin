@@ -9,21 +9,14 @@ import { SPOTIFY_LOGIN_URL } from '../../core/api/auth.service';
 import {
   CatalogService,
   CatalogTrack,
-  KeyMove,
   Suggestion,
   SuggestionOptions,
 } from '../../core/api/catalog.service';
+import { KEY_MOVE_LABELS } from '../../shared/key-moves';
 
 /** Écarts de BPM proposés (fractions) ; 0.06 = ±6 %, la valeur par défaut de l'API. */
 export const TOLERANCES = [0.02, 0.04, 0.06, 0.08, 0.1, 0.12] as const;
 const DEFAULT_TOLERANCE = 0.06;
-
-const MOVE_LABELS: Record<KeyMove, string> = {
-  same: 'Même tonalité',
-  adjacent: 'Tonalité voisine',
-  relative: 'Relative (mineur ↔ majeur)',
-  energy_shift: "Saut de 2 (montée d'énergie)",
-};
 
 type State =
   | { kind: 'loading' }
@@ -46,7 +39,7 @@ export class SuggestionsPage {
 
   protected readonly loginUrl = SPOTIFY_LOGIN_URL;
   protected readonly tolerances = TOLERANCES;
-  protected readonly moveLabels = MOVE_LABELS;
+  protected readonly moveLabels = KEY_MOVE_LABELS;
 
   /** Morceau de départ (dans l'URL : /suggestions/:trackId). */
   private trackId = '';

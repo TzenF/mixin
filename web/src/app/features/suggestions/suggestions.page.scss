@@ -40,21 +40,10 @@ li {
 }
 
 button.suggestion {
-  @include m.panel;
-  @include m.focus-ring;
+  @include m.card-button;
   display: flex;
   flex-direction: column;
   gap: t.$space-1;
-  width: 100%;
-  border: t.$border-width solid var(--color-border);
-  color: var(--color-text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-
-  &:hover {
-    border-color: var(--color-primary);
-  }
 }
 
 .details {
@@ -62,10 +51,9 @@ button.suggestion {
 }
 
 .badge {
+  @include m.badge;
   @include m.status(success);
   margin-left: t.$space-1;
-  padding: 0 t.$space-2;
-  border-radius: t.$radius-sm;
 }
 
 button,

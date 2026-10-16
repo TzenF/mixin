@@ -104,14 +104,17 @@ WHERE {_MINE_SQL}
   AND (%(status)s::analysis_status IS NULL OR t.analysis_status = %(status)s::analysis_status)
 """
 
-_CATALOG_SELECT = f"""
-SELECT t.id, t.title, {_ARTISTS_SQL} AS artists,
+# Colonnes d'un CatalogRow, pour un morceau `t` joint à effective_features `f` (catalogue, playlists).
+TRACK_COLUMNS_SQL = f"""
+       t.id, t.title, {_ARTISTS_SQL} AS artists,
        f.bpm::float AS bpm,
        f.camelot_num || f.camelot_letter AS camelot,
        f.bpm_source::text AS bpm_source, f.key_source::text AS key_source,
        f.key_confidence::float AS key_confidence,
        t.analysis_status::text AS analysis_status
 """
+
+_CATALOG_SELECT = f"SELECT {TRACK_COLUMNS_SQL}"
 
 # Liste fermée : le tri est inséré tel quel dans le SQL, jamais une valeur venue de la requête HTTP.
 _CATALOG_ORDER: dict[CatalogSort, str] = {

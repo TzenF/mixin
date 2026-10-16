@@ -1,0 +1,77 @@
+@use 'mixins' as m;
+@use 'tokens' as t;
+
+main {
+  @include m.page;
+}
+
+.hint {
+  @include m.text-muted;
+}
+
+.error {
+  @include m.text-danger;
+}
+
+ol {
+  @include m.reset-list;
+}
+
+.track {
+  @include m.panel;
+  display: flex;
+  align-items: center;
+  gap: t.$space-3;
+  border: t.$border-width solid var(--color-border);
+}
+
+.index {
+  @include m.text-muted;
+  font-variant-numeric: tabular-nums;
+}
+
+.what {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.title {
+  font-weight: t.$font-weight-bold;
+}
+
+.values {
+  font-size: t.$font-size-sm;
+  white-space: nowrap;
+}
+
+.transition {
+  margin: t.$space-1 0 t.$space-1 t.$space-6;
+  font-size: t.$font-size-sm;
+
+  &.ok {
+    @include m.text-muted;
+  }
+
+  &.warn {
+    @include m.text-danger;
+  }
+
+  &.unknown {
+    @include m.text-muted;
+  }
+}
+
+.badge {
+  @include m.badge;
+  @include m.status(success);
+}
+
+button,
+.button {
+  @include m.button-primary;
+}
+
+button.secondary {
+  @include m.button-secondary;
+}

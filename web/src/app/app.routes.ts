@@ -28,5 +28,16 @@ export const routes: Routes = [
       import('./features/suggestions/suggestions.page').then((m) => m.SuggestionsPage),
     title: 'Suggestions · DJ Platform',
   },
+  {
+    path: 'playlists',
+    loadComponent: () => import('./features/playlists/playlists.page').then((m) => m.PlaylistsPage),
+    title: 'Playlists · DJ Platform',
+  },
+  {
+    path: 'playlists/:playlistId',
+    loadComponent: () =>
+      import('./features/playlists/playlist-detail.page').then((m) => m.PlaylistDetailPage),
+    title: 'Playlist · DJ Platform',
+  },
   { path: '**', redirectTo: '' },
 ];
