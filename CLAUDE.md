@@ -83,6 +83,8 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Importer une playlist | `app/services/playlist_import.py` → `PlaylistImporter` |
 | Lancer une analyse | `app/adapters/queue.py` → `TaskQueue.enqueue_analysis` (déjà dédoublonné) |
 | Analyser un morceau (exécuté par le worker) | `app/services/track_analysis.py` → `TrackAnalyzer` |
+| Relancer les morceaux en attente | `make analyze-pending` → `track_analysis.enqueue_pending` |
+| Savoir si on est en production | `Settings.is_production` (`ENVIRONMENT`) |
 | Extrait Deezer par ISRC | `app/adapters/deezer_client.py` → `DeezerClient` (`DeezerUnavailableError` = réessayer plus tard) |
 | Valeurs Essentia en base | `app/adapters/analysis_repository.py` → `AnalysisRepository` |
 | Test d'une route qui exige une session | fixture `logged_in_client` (`tests/conftest.py`) |
@@ -107,6 +109,7 @@ make test        # tests back (pytest) + front (vitest)
 make lint        # ruff check + ruff format --check (dont docstrings)
 make logs | make down | make psql
 make reset-db    # efface la base et rejoue les migrations
+make analyze-pending  # met en file d'analyse les morceaux restés « pending » (sans doublon)
 ```
 
 Un test backend seul : `docker compose exec api pytest -q tests/test_api.py::test_suggestions`
@@ -190,13 +193,21 @@ vide**. Nouveau fichier numéroté, puis `make reset-db` en dev.
   `track.analysis_status`.
 - **Les tests utilisent la base Redis 15** (forcée dans `tests/conftest.py`) : le worker de dev, sur la
   base 0, n'exécute pas leurs tâches.
+- **Les tests PostgreSQL tournent sur la base de dev** (choix assumé), qui contient de vrais morceaux
+  analysés : un test ne vérifie que **ses propres lignes** (filtre sur ses ID ou son `test_prefix`), jamais
+  « le résultat entier ».
 - Postgres et Redis ne sont publiés que sur `127.0.0.1` (mots de passe de dev, Redis sans authentification).
 
 ## Mise en ligne (pas encore faite : à revoir le jour d'un déploiement)
 
-Réglages de dev à changer : `SESSION_COOKIE_SECURE=true` (HTTPS), vrais mots de passe Postgres et Redis,
-`/docs` désactivé, conteneurs non-root, pas de `--reload` ni de `watchfiles`, aucun port de base ou de
-Redis publié.
+Hébergeur et reverse proxy pas encore choisis. Déjà en place : `ENVIRONMENT=production` refuse de démarrer
+avec un réglage de dev (cookie non `Secure`, clé de chiffrement vide, redirect URI en HTTP, mot de passe de dev
+de la base) et masque `/docs`.
+
+Reste à faire au déploiement : vrais mots de passe Postgres et Redis, conteneurs non-root, pas de `--reload`
+ni de `watchfiles`, aucun port de base ou de Redis publié, reverse proxy HTTPS qui sert le front et `/api` sur
+la même origine, avec rate limiting sur `/auth/spotify/login` (sans session, il écrit une clé Redis à chaque
+appel) et en-têtes de sécurité (CSP, HSTS), sauvegardes PostgreSQL, worker sur x86_64.
 
 ## Analyse audio (résultats des spikes, voir spikes/README.md)
 
