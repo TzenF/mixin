@@ -76,6 +76,26 @@
           }}
         </button>
       }
+      <button
+        type="button"
+        class="secondary"
+        [disabled]="playlist.items.length === 0"
+        (click)="downloadText('detailed')"
+        title="BPM, tonalité et enchaînements, pour préparer le set"
+        data-testid="download-detailed"
+      >
+        TXT détaillé
+      </button>
+      <button
+        type="button"
+        class="secondary"
+        [disabled]="playlist.items.length === 0"
+        (click)="downloadText('tracklist')"
+        title="Artistes et titres seulement, pour partager la tracklist"
+        data-testid="download-tracklist"
+      >
+        Tracklist
+      </button>
       <button type="button" class="secondary" (click)="duplicate()" data-testid="duplicate">
         {{ playlist.source_provider === null ? 'Dupliquer' : 'Dupliquer pour modifier' }}
       </button>

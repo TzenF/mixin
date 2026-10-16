@@ -17,10 +17,11 @@ import {
   PlaylistDetail,
   PlaylistItem,
   PlaylistService,
-  Transition,
 } from '../../core/api/playlist.service';
 import { CurrentPlaylistService } from '../../core/current-playlist.service';
-import { KEY_MOVE_LABELS, formatBpmChange } from '../../shared/key-moves';
+import { FileDownloadService } from '../../core/file-download.service';
+import { describeTransition } from '../../shared/key-moves';
+import { PlaylistTextFormat, playlistFileName, playlistText } from '../../shared/playlist-text';
 
 type State =
   | { kind: 'loading' }
@@ -28,12 +29,6 @@ type State =
   | { kind: 'not_found' }
   | { kind: 'ready'; playlist: PlaylistDetail }
   | { kind: 'error'; message: string };
-
-/** Enchaînement affiché entre deux morceaux : bon, à vérifier (⚠) ou inconnu (morceau non analysé). */
-export interface TransitionView {
-  kind: 'ok' | 'warn' | 'unknown';
-  text: string;
-}
 
 /** Page « Playlist » : morceaux dans l'ordre et qualité de chaque enchaînement. */
 @Component({
@@ -46,6 +41,7 @@ export class PlaylistDetailPage {
   private readonly service = inject(PlaylistService);
   private readonly router = inject(Router);
   protected readonly currentPlaylist = inject(CurrentPlaylistService);
+  private readonly files = inject(FileDownloadService);
   private readonly playlistId = inject(ActivatedRoute).snapshot.paramMap.get('playlistId') ?? '';
 
   protected readonly loginUrl = SPOTIFY_LOGIN_URL;
@@ -185,6 +181,14 @@ export class PlaylistDetailPage {
     });
   }
 
+  /** Télécharge la playlist en texte : détaillée (BPM, tonalité, enchaînements) ou simple tracklist. */
+  protected downloadText(format: PlaylistTextFormat): void {
+    const playlist = this.playlist();
+    if (playlist !== null) {
+      this.files.saveText(playlistFileName(playlist.name, format), playlistText(playlist, format));
+    }
+  }
+
   /** Exporte la playlist vers Spotify, ou met à jour l'export précédent. */
   protected exportToSpotify(): void {
     this.exporting.set(true);
@@ -259,28 +263,4 @@ export class PlaylistDetailPage {
       this.actionError.set(apiErrorMessage(err, fallback));
     }
   }
-}
-
-/** Texte de l'enchaînement : « → +0,8 % · Tonalité voisine », « ⚠ tempo +8,0 % », « ⚠ tonalité éloignée (5 crans) »… */
-export function describeTransition(t: Transition | null): TransitionView {
-  if (t === null) {
-    return { kind: 'unknown', text: '? Enchaînement inconnu (morceau non analysé)' };
-  }
-  const tempo = t.half_double ? '½ / ×2 tempo' : formatBpmChange(t.bpm_change);
-  if (t.compatible && t.key_move) {
-    return { kind: 'ok', text: `→ ${tempo} · ${KEY_MOVE_LABELS[t.key_move]}` };
-  }
-  const problems = [];
-  if (!t.key_move) {
-    const steps = `${t.key_distance} cran${t.key_distance > 1 ? 's' : ''}`;
-    problems.push(
-      t.same_mode
-        ? `tonalité éloignée (${steps})`
-        : `tonalité incompatible (${steps} et mineur ↔ majeur)`,
-    );
-  }
-  if (!t.tempo_ok) {
-    problems.push(`tempo ${formatBpmChange(t.bpm_change)}`);
-  }
-  return { kind: 'warn', text: `⚠ ${problems.join(' et ')}` };
 }

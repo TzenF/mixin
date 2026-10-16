@@ -6,9 +6,11 @@ import { By } from '@angular/platform-browser';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { CatalogTrack } from '../../core/api/catalog.service';
 import { PlaylistDetail, Transition } from '../../core/api/playlist.service';
-import { PlaylistDetailPage, describeTransition } from './playlist-detail.page';
+import { describeTransition } from '../../shared/key-moves';
+import { PlaylistDetailPage } from './playlist-detail.page';
 import { CurrentPlaylistService } from '../../core/current-playlist.service';
 import { FakeCurrentPlaylistService } from '../../core/current-playlist.service.fake';
+import { FileDownloadService } from '../../core/file-download.service';
 
 const TRACK: CatalogTrack = {
   id: 't1',
@@ -103,15 +105,18 @@ describe('describeTransition', () => {
 describe('PlaylistDetailPage', () => {
   let http: HttpTestingController;
   let navigate: ReturnType<typeof vi.fn>;
+  let saveText: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     navigate = vi.fn().mockResolvedValue(true);
+    saveText = vi.fn();
     TestBed.configureTestingModule({
       imports: [PlaylistDetailPage],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: CurrentPlaylistService, useValue: new FakeCurrentPlaylistService() },
+        { provide: FileDownloadService, useValue: { saveText } },
         { provide: Router, useValue: { navigate } },
         {
           provide: ActivatedRoute,
@@ -353,5 +358,20 @@ describe('PlaylistDetailPage', () => {
 
     expect(all(fixture, 'action-error')[0].textContent).toContain('reconnecte-toi');
     expect(all(fixture, 'item').length).toBe(3);
+  });
+
+  it('télécharge la playlist en TXT détaillé ou en tracklist', async () => {
+    const fixture = await render((req) => req.flush({ ...PLAYLIST, source_provider: 'spotify' }));
+
+    all(fixture, 'download-detailed')[0].click();
+    expect(saveText).toHaveBeenLastCalledWith(
+      'Set du samedi.txt',
+      expect.stringContaining('⚠ tempo +8,0 %'),
+    );
+    all(fixture, 'download-tracklist')[0].click();
+    expect(saveText).toHaveBeenLastCalledWith(
+      'Set du samedi (tracklist).txt',
+      expect.stringContaining('02. FISHER – Rock That Body\n'),
+    );
   });
 });

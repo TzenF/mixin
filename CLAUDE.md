@@ -104,7 +104,9 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Playlists côté front | `web/src/app/core/api/playlist.service.ts` → `PlaylistService` |
 | Playlist « en cours » (front) | `web/src/app/core/current-playlist.service.ts` → `CurrentPlaylistService` ; pour les tests des pages : `FakeCurrentPlaylistService` (`current-playlist.service.fake.ts`) |
 | Bouton « + Ajouter », barre « Playlist en cours » | `web/src/app/shared/add-to-playlist/`, `web/src/app/shared/current-playlist-bar/` |
-| Libellés d'enchaînement, écart de BPM signé (front) | `web/src/app/shared/key-moves.ts` → `KEY_MOVE_LABELS`, `formatBpmChange` |
+| Libellés et texte d'un enchaînement, écart de BPM signé (front) | `web/src/app/shared/key-moves.ts` → `KEY_MOVE_LABELS`, `formatBpmChange`, `describeTransition` |
+| Playlist en texte (TXT détaillé ou tracklist) | `web/src/app/shared/playlist-text.ts` → `playlistText`, `playlistFileName` (généré côté front : pas de route API) |
+| Faire télécharger un fichier par le navigateur | `web/src/app/core/file-download.service.ts` → `FileDownloadService.saveText` |
 | Catalogue côté front | `web/src/app/core/api/catalog.service.ts` → `CatalogService` (`tracks`, `track`, `suggestions`, `flipMode`) |
 
 Tenir ce tableau à jour quand on ajoute un élément réutilisable.
@@ -168,7 +170,7 @@ Ne pas reproposer ces alternatives sans élément nouveau.
 - **Comptes utilisateurs à nous** ; les services musicaux sont *associés* (`music_account`), jetons chiffrés.
 - **BPM / tonalité : une ligne par source dans `track_analysis`, jamais écrasée.** La valeur affichée est
   calculée à la lecture par `effective_features(user)` avec la priorité :
-  correction perso > rekordbox perso > correction admin (globale) > Essentia.
+  correction perso > rekordbox perso (inutilisé : import rekordbox retiré) > correction admin (globale) > Essentia.
 - Tonalité stockée en Camelot (`camelot_num` 1–12 + `camelot_letter` A=mineur / B=majeur).
 - **Règle d'enchaînement** (fonction SQL `transition`, seul endroit où elle est écrite) et score de tonalité :
   même tonalité 1.00, ±1 cran 0.90, relative (même numéro, autre lettre) 0.85, **diagonale** (±1 cran et autre
@@ -247,9 +249,14 @@ Fait : spikes, schéma, squelette (Compose, API, worker, front, CI), règles de 
 playlists, worker d'analyse (Deezer + Essentia), catalogue filtrable (page `/catalog`), bouton
 « inverser majeur/mineur », page d'accueil, page Suggestions (`/suggestions/:trackId`, enchaînement au clic), playlists (lecture avec
 la qualité des enchaînements, playlist en cours + « + Ajouter », glisser-déposer `@angular/cdk`), export vers
-Spotify (playlist privée, réexport = mise à jour). **Non vérifié** : la playlist exportée apparaît dans rekordbox.
-À faire, dans l'ordre : export TXT / M3U → favoris → import XML rekordbox (avec écran des morceaux
-non reconnus) et corrections manuelles.
+Spotify (playlist privée, réexport = mise à jour), export TXT (détaillé ou tracklist). **Non vérifié** : la playlist exportée apparaît dans rekordbox.
+À faire, dans l'ordre : favoris → corrections manuelles (corriger un BPM, saisir une tonalité,
+annuler une correction).
+
+Retirés (16/10/2026) : **import XML rekordbox** (l'autrice utilise rekordbox seulement comme destination, via
+Spotify) et donc **export M3U** (sans import rekordbox, aucun chemin de fichier audio : un M3U serait vide).
+La source `rekordbox` reste dans le schéma et dans la priorité de `effective_features`, inutilisée : ne pas la
+retirer (migration sans bénéfice).
 
 Hors V1 (ne pas anticiper) : extraits audio dans le navigateur, partage/commentaires, page Discover,
 embeddings (pgvector) et recherche par texte, génération de playlist par LLM.
