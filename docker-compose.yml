@@ -17,7 +17,7 @@ services:
       # Exécuté UNIQUEMENT au premier démarrage (volume vide). Après un changement : make reset-db
       - ./db/migrations:/docker-entrypoint-initdb.d:ro
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "127.0.0.1:${DB_PORT:-5432}:5432"   # jamais exposé au réseau : mot de passe de dev
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U dj -d dj"]
       interval: 3s
@@ -27,7 +27,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"   # Redis sans mot de passe : local uniquement
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 3s
@@ -59,10 +59,15 @@ services:
     build:
       context: ./backend
       target: worker
-    environment: *backend-env
+    environment:
+      <<: *backend-env
+      # Le code monté passe avant la copie installée dans l'image par `pip install .`
+      PYTHONPATH: /app
     volumes:
       - ./backend/app:/app/app
-    command: ["arq", "app.worker.main.WorkerSettings", "--watch", "app"]
+    # watchfiles relance le processus (arq --watch garde les modules déjà importés : code jamais rechargé)
+    command: ["watchfiles", "--filter", "python", "--target-type", "command",
+              "arq app.worker.main.WorkerSettings", "app"]
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_healthy }
