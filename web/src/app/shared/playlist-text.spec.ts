@@ -33,7 +33,7 @@ const SET: PlaylistDetail = {
   updated_at: '2026-10-16T14:00:00Z',
   spotify_export: null,
   items: [
-    { item_id: 1, position: 0, track: TRACK, transition_to_next: GOOD },
+    { item_id: 1, position: 0, track: TRACK, transition_to_next: GOOD, my_rating: null },
     {
       item_id: 2,
       position: 1,
@@ -45,12 +45,14 @@ const SET: PlaylistDetail = {
         camelot: '7A',
       },
       transition_to_next: null,
+      my_rating: null,
     },
     {
       item_id: 3,
       position: 2,
       track: { ...TRACK, title: 'Inédit', artists: [], bpm: null, camelot: null },
       transition_to_next: null,
+      my_rating: null,
     },
   ],
 };

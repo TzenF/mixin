@@ -11,6 +11,7 @@ from app.adapters.deezer_client import DeezerClient
 from app.adapters.oauth_state_store import OAuthStateStore
 from app.adapters.playlist_repository import PlaylistRepository
 from app.adapters.queue import TaskQueue
+from app.adapters.rating_repository import RatingRepository
 from app.adapters.spotify_auth import SpotifyAuth
 from app.adapters.spotify_provider import SpotifyProvider
 from app.adapters.token_cipher import TokenCipher
@@ -125,3 +126,8 @@ def get_preview_service(
 ) -> PreviewService:
     """Fournit le service qui trouve l'URL de l'extrait Deezer d'un morceau."""
     return PreviewService(tracks, DeezerClient(client))
+
+
+def get_rating_repository(db: Annotated[Database, Depends(get_db)]) -> RatingRepository:
+    """Fournit le dépôt des notes de transitions."""
+    return RatingRepository(db)

@@ -1,0 +1,55 @@
+<span class="rating" [class.invite]="justListened()" data-testid="transition-rating">
+  @if (justListened() && current() === null) {
+    <span class="label" data-testid="rating-invite">Note cet enchaînement :</span>
+  }
+  @for (value of scale; track value) {
+    <button
+      type="button"
+      class="value"
+      [class.on]="current()?.rating === value"
+      [attr.aria-pressed]="current()?.rating === value"
+      [title]="'Noter ' + value + ' sur 5'"
+      (click)="rate(value)"
+      [attr.data-testid]="'rate-' + value"
+    >
+      {{ value }}
+    </button>
+  }
+  <button
+    type="button"
+    class="value"
+    [class.on]="current()?.comment"
+    [title]="current()?.comment ?? 'Ajouter un commentaire'"
+    (click)="commenting.set(!commenting())"
+    data-testid="rating-comment-toggle"
+  >
+    💬
+  </button>
+  @if (current() !== null) {
+    <button
+      type="button"
+      class="value"
+      title="Effacer ma note"
+      (click)="clear()"
+      data-testid="rating-clear"
+    >
+      ×
+    </button>
+  }
+  @if (commenting()) {
+    <form class="comment" novalidate (submit)="$event.preventDefault(); saveComment(comment)">
+      <input
+        #comment
+        type="text"
+        maxlength="500"
+        placeholder="Pourquoi ? (facultatif)"
+        [value]="current()?.comment ?? ''"
+        data-testid="rating-comment"
+      />
+      <button type="submit" class="value" data-testid="rating-comment-save">OK</button>
+    </form>
+  }
+  @if (error(); as message) {
+    <span class="error" data-testid="rating-error">{{ message }}</span>
+  }
+</span>

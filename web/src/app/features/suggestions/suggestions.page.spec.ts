@@ -33,6 +33,7 @@ const ROCK: Suggestion = {
   bpm_diff_pct: 0.8,
   score: 0.777,
   favorite: false,
+  my_rating: null,
 };
 const DOUBLE: Suggestion = {
   ...ROCK,
@@ -245,6 +246,21 @@ describe('SuggestionsPage', () => {
     expect(root.querySelector('[data-testid="listen-disclaimer"]')?.textContent).toContain(
       'pas la vraie fin',
     );
+  });
+
+  it('propose de noter l’enchaînement départ → chaque suggestion', async () => {
+    setup();
+    const fixture = create();
+    await answer(fixture, SEED, [
+      { ...ROCK, my_rating: { rating: 5, comment: 'parfait' } },
+      DOUBLE,
+    ]);
+    const ratings = (fixture.nativeElement as HTMLElement).querySelectorAll(
+      '.suggestion-row [data-testid="transition-rating"]',
+    );
+
+    expect(ratings.length).toBe(2);
+    expect(ratings[0].querySelector('[aria-pressed="true"]')?.textContent?.trim()).toBe('5');
   });
 
   it('signale quand aucun morceau n’est compatible', async () => {

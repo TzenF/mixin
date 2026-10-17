@@ -11,6 +11,7 @@ export class FakeAudioPlayerService {
   readonly state = signal<PlayerState>('idle');
   readonly progress = signal(0);
   readonly error = signal<PlayError | null>(null);
+  readonly lastFinished = signal<{ fromId: string; toId: string } | null>(null);
   /** Appels reçus, dans l'ordre (« toggle:a », « transition:a>b »). */
   readonly calls: string[] = [];
 

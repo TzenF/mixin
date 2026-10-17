@@ -12,6 +12,7 @@ from app.adapters.db import Database
 from app.adapters.queue import TaskQueue
 from app.adapters.track_repository import CatalogFilters, CatalogSort, TrackRepository
 from app.api.deps import get_current_user_id, get_db, get_preview_service, get_queue, get_track_repository
+from app.api.transitions import RatingOut
 from app.domain.camelot import CamelotKey
 from app.services.preview import PreviewService
 from app.services.track_correction import (
@@ -105,6 +106,7 @@ class Suggestion(BaseModel):
     bpm_diff_pct: float
     score: float
     favorite: bool
+    my_rating: RatingOut | None
 
 
 async def _ensure_exists(tracks: TrackRepository, track_id: UUID) -> None:
@@ -134,7 +136,15 @@ async def suggestions(
         only_mine=scope == "mine",
         favorites_only=favorites,
     )
-    return [Suggestion(**asdict(r)) for r in rows]
+    return [
+        Suggestion(
+            **{k: v for k, v in asdict(r).items() if k not in ("my_rating", "my_comment")},
+            my_rating=RatingOut(rating=r.my_rating, comment=r.my_comment)
+            if r.my_rating is not None
+            else None,
+        )
+        for r in rows
+    ]
 
 
 @router.get("/{track_id}")

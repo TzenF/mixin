@@ -1,0 +1,38 @@
+@use 'mixins' as m;
+@use 'tokens' as t;
+
+.rating {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: t.$space-1;
+  margin-left: t.$space-2;
+
+  &.invite {
+    @include m.badge;
+    @include m.status(success);
+  }
+}
+
+button.value {
+  @include m.icon-button;
+  margin-left: 0;
+
+  &.on {
+    @include m.button-primary;
+    padding: 0 t.$space-2;
+  }
+}
+
+.comment {
+  display: inline-flex;
+  gap: t.$space-1;
+
+  input {
+    @include m.field;
+  }
+}
+
+.error {
+  @include m.text-danger;
+}

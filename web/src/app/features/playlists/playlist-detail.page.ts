@@ -26,6 +26,7 @@ import {
   PlayTransitionButtonComponent,
   TRANSITION_DISCLAIMER,
 } from '../../shared/play-transition-button/play-transition-button.component';
+import { TransitionRatingComponent } from '../../shared/transition-rating/transition-rating.component';
 import { FavoriteButtonComponent } from '../../shared/favorite-button/favorite-button.component';
 import { describeTransition } from '../../shared/key-moves';
 import { PlaylistTextFormat, playlistFileName, playlistText } from '../../shared/playlist-text';
@@ -50,6 +51,7 @@ type State =
     TrackCorrectionComponent,
     PlayButtonComponent,
     PlayTransitionButtonComponent,
+    TransitionRatingComponent,
   ],
   templateUrl: './playlist-detail.page.html',
   styleUrl: './playlist-detail.page.scss',

@@ -7,6 +7,7 @@ from typing import Literal
 from uuid import UUID
 
 from app.adapters.db import Queryable
+from app.adapters.rating_repository import RATING_JOIN_SQL
 from app.domain.camelot import CamelotKey
 
 CatalogSort = Literal["title", "bpm", "key"]
@@ -67,6 +68,8 @@ class SuggestionRow:
     bpm_diff_pct: float
     score: float
     favorite: bool
+    my_rating: int | None  # ma note de l'enchaînement départ -> ce morceau
+    my_comment: str | None
 
 
 # Artistes du morceau `t`, dans l'ordre d'affichage.
@@ -90,9 +93,11 @@ _FAVORITES_ONLY_SQL = f"(NOT %(favorites_only)s OR {_FAVORITE_SQL})"
 # suggest_tracks est appelée sans limite (NULL) : le filtre « mes morceaux » s'applique avant la limite.
 _SUGGEST_SQL = f"""
 SELECT s.track_id, t.title, {_ARTISTS_SQL} AS artists, s.bpm::float AS bpm, s.camelot, s.key_move,
-       s.half_double, s.bpm_diff::float AS bpm_diff_pct, s.score::float AS score, {_FAVORITE_SQL} AS favorite
+       s.half_double, s.bpm_diff::float AS bpm_diff_pct, s.score::float AS score, {_FAVORITE_SQL} AS favorite,
+       my_r.rating AS my_rating, my_r.comment AS my_comment
 FROM suggest_tracks(%(user_id)s::uuid, %(seed)s::uuid, %(tolerance)s::numeric, NULL::integer) s
 JOIN track t ON t.id = s.track_id
+{RATING_JOIN_SQL.format(from_col="%(seed)s::uuid", to_col="s.track_id")}
 WHERE {_MINE_SQL} AND {_FAVORITES_ONLY_SQL}
 ORDER BY s.score DESC, lower(t.title), t.id
 LIMIT %(limit)s

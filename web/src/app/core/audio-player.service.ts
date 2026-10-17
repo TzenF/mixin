@@ -57,6 +57,8 @@ export class AudioPlayerService {
   readonly progress = signal(0);
   /** Dernier échec, ou null. */
   readonly error = signal<PlayError | null>(null);
+  /** Enchaînement écouté jusqu'au bout en dernier (pour inviter à le noter), ou null. */
+  readonly lastFinished = signal<{ fromId: string; toId: string } | null>(null);
 
   private readonly urls = new Map<string, { url: string; validUntil: number }>();
   private audios: HTMLAudioElement[] = [];
@@ -197,6 +199,7 @@ export class AudioPlayerService {
           this.progress.set(ratio(elapsed, total));
           if (bStarted && b.currentTime >= TRANSITION.nextSeconds) {
             this.stop();
+            this.lastFinished.set({ fromId, toId });
           }
         }, TRANSITION.tickMs);
       },
@@ -210,6 +213,7 @@ export class AudioPlayerService {
     this.current.set(playing);
     this.state.set('loading');
     this.error.set(null);
+    this.lastFinished.set(null);
     return this.session;
   }
 

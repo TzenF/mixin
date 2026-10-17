@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { apiErrorMessage } from '../../core/api/api-error';
 import { SPOTIFY_LOGIN_URL } from '../../core/api/auth.service';
 import { PlaylistService, PlaylistSummary } from '../../core/api/playlist.service';
+import { RatingService } from '../../core/api/rating.service';
 import { CurrentPlaylistService } from '../../core/current-playlist.service';
 
 type State =
@@ -24,6 +25,8 @@ export class PlaylistsPage {
   protected readonly currentPlaylist = inject(CurrentPlaylistService);
 
   protected readonly loginUrl = SPOTIFY_LOGIN_URL;
+  /** Nombre d'enchaînements que j'ai notés, ou null tant qu'il n'est pas connu. */
+  protected readonly ratedCount = signal<number | null>(null);
   protected readonly state = signal<State>({ kind: 'loading' });
   /** Échec de la dernière action (créer, dupliquer, supprimer), ou null. */
   protected readonly actionError = signal<string | null>(null);
@@ -43,6 +46,12 @@ export class PlaylistsPage {
   constructor() {
     this.load();
     this.currentPlaylist.refresh();
+    inject(RatingService)
+      .count()
+      .subscribe({
+        next: (count) => this.ratedCount.set(count),
+        error: () => this.ratedCount.set(null),
+      });
   }
 
   /** Charge mes playlists ; 401 = pas connectée. */

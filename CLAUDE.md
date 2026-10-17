@@ -107,6 +107,8 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Bouton ★ / ☆ (front) | `web/src/app/shared/favorite-button/` |
 | URL d'un extrait Deezer (à l'écoute, jamais stockée) | `services/preview.py` → `PreviewService` ; route `GET /tracks/{id}/preview` (`no-store`, 404 avec `reason`, 503 si Deezer flanche) ; `DeezerClient.get_track`, `preview_expiry` |
 | Lecture des extraits (front, un seul son à la fois) | `web/src/app/core/audio-player.service.ts` → `AudioPlayerService` (`toggle`, `toggleTransition`, `AUDIO_FACTORY`) ; pour les tests : `FakeAudioPlayerService` |
+| Notes des transitions (1 à 5, commentaire) | `app/adapters/rating_repository.py` → `RatingRepository`, `RATING_JOIN_SQL` (ma note dans les playlists et les suggestions : `my_rating`) ; routes `PUT` / `DELETE /transitions/{a}/{b}/rating`, `GET /transitions/ratings/count` |
+| Noter un enchaînement (front) | `web/src/app/core/api/rating.service.ts` → `RatingService` ; composant `web/src/app/shared/transition-rating/` (mis en avant après l'écoute : `AudioPlayerService.lastFinished`) |
 | Boutons ▶ / ⏸ et « Écouter l'enchaînement » | `web/src/app/shared/play-button/`, `web/src/app/shared/play-transition-button/` (`TRANSITION_DISCLAIMER`) |
 | Bouton « Corriger » (BPM ×2 / ÷2, tonalité, annuler) | `web/src/app/shared/track-correction/` (émet le morceau corrigé) |
 | Bouton « + Ajouter », barre « Playlist en cours » | `web/src/app/shared/add-to-playlist/`, `web/src/app/shared/current-playlist-bar/` |
@@ -275,10 +277,13 @@ Corrections manuelles (BPM avec ×2 / ÷2, tonalité, annuler ma correction).
 **V1 terminée** (17/10/2026). Vérifié en réel : export Spotify, mise à jour au réexport, visible dans rekordbox.
 
 V2, dans l'ordre (une étape à la fois, plan validé avant de coder) :
-1. **Écouter les extraits** dans le navigateur : un morceau, et « l'enchaînement » (fin de A, fondu, début de B).
-   Le navigateur lit directement l'URL Deezer ; le serveur ne télécharge, ne stocke ni ne relaie l'audio.
-2. **Noter les transitions** (1 à 5, commentaire facultatif, sens A → B, table `transition_rating`) depuis une
-   playlist et les suggestions. Le score n'est pas modifié tant qu'il n'y a pas quelques dizaines de notes.
+1. ~~**Écouter les extraits**~~ : fait (17/10/2026). Le navigateur lit directement l'URL Deezer ; le serveur ne
+   télécharge, ne stocke ni ne relaie l'audio.
+2. ~~**Noter les transitions**~~ : fait (17/10/2026). 1 à 5 et commentaire facultatif, sens A → B, table
+   `transition_rating` telle quelle, depuis une playlist et les suggestions ; boutons en chiffres (les étoiles ★
+   sont les favoris) ; compteur sur la page Playlists ; rendu à soigner plus tard. Le score n'est pas modifié tant
+   qu'il n'y a pas quelques dizaines de notes. Pas de photo de l'enchaînement au moment de la note : l'analyse
+   recalculera les composantes avec `transition` et les valeurs actuelles (corrigées).
 3. **Énergie** : d'abord un spike (mesures Essentia comparées à mon classement de « vib »), puis colonne,
    `effective_features`, réanalyse, filtre, courbe d'énergie, sens monter / tenir / redescendre.
    Limite : l'énergie de 30 s d'extrait n'est pas celle du morceau entier.

@@ -31,6 +31,12 @@ export interface CatalogPage {
 /** Type d'enchaînement de tonalité (roue Camelot). */
 export type KeyMove = 'same' | 'adjacent' | 'relative' | 'diagonal' | 'energy_shift';
 
+/** Ma note d'un enchaînement A → B (1 à 5) et mon commentaire éventuel. */
+export interface TransitionRating {
+  rating: number;
+  comment: string | null;
+}
+
 /** Un morceau qui s'enchaîne bien après le morceau de départ (voir backend/app/api/tracks.py). */
 export interface Suggestion {
   track_id: string;
@@ -44,6 +50,8 @@ export interface Suggestion {
   bpm_diff_pct: number;
   score: number;
   favorite: boolean;
+  /** Ma note de l'enchaînement départ → ce morceau, ou null. */
+  my_rating: TransitionRating | null;
 }
 
 /** Réglages des suggestions. */

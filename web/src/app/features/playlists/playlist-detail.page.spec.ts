@@ -54,18 +54,20 @@ const PLAYLIST: PlaylistDetail = {
   updated_at: '2026-10-16T14:00:00Z',
   spotify_export: null,
   items: [
-    { item_id: 1, position: 0, track: TRACK, transition_to_next: GOOD },
+    { item_id: 1, position: 0, track: TRACK, transition_to_next: GOOD, my_rating: null },
     {
       item_id: 2,
       position: 1,
       track: { ...TRACK, id: 't2', title: 'Rock That Body' },
       transition_to_next: TOO_FAST,
+      my_rating: null,
     },
     {
       item_id: 3,
       position: 2,
       track: { ...TRACK, id: 't3', title: 'Trop rapide', bpm: 135 },
       transition_to_next: null,
+      my_rating: null,
     },
   ],
 };
@@ -405,5 +407,18 @@ describe('PlaylistDetailPage', () => {
     transitions[1].click();
     expect(player.calls).toEqual(['transition:t2>t3']);
     expect(all(fixture, 'listen-disclaimer')[0].textContent).toContain('pas la vraie fin');
+  });
+
+  it('propose de noter chaque enchaînement, avec ma note si elle existe', async () => {
+    const items = [
+      { ...PLAYLIST.items[0], my_rating: { rating: 4, comment: null } },
+      ...PLAYLIST.items.slice(1),
+    ];
+    const fixture = await render((req) => req.flush({ ...PLAYLIST, items }));
+
+    const ratings = all(fixture, 'transition-rating');
+    expect(ratings.length).toBe(2); // pas après le dernier morceau
+    expect(ratings[0].querySelector('[aria-pressed="true"]')?.textContent?.trim()).toBe('4');
+    expect(ratings[1].querySelector('[aria-pressed="true"]')).toBeNull();
   });
 });

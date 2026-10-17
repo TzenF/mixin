@@ -7,6 +7,7 @@ from datetime import datetime
 from uuid import UUID
 
 from app.adapters.db import Queryable
+from app.adapters.rating_repository import RATING_JOIN_SQL, RatingRow
 from app.adapters.track_repository import TRACK_COLUMNS_SQL, CatalogRow
 
 
@@ -51,6 +52,7 @@ class PlaylistItemRow:
     position: int
     track: CatalogRow
     transition_to_next: TransitionRow | None
+    my_rating: RatingRow | None = None  # ma note de ce morceau vers le suivant
 
 
 _PLAYLIST_SQL = """
@@ -74,17 +76,19 @@ paired AS (
     SELECT items.*,
            LEAD(raw_bpm) OVER w AS next_bpm,
            LEAD(raw_num) OVER w AS next_num,
-           LEAD(raw_letter) OVER w AS next_letter
+           LEAD(raw_letter) OVER w AS next_letter,
+           LEAD(id) OVER w AS next_track_id
     FROM items
     WINDOW w AS (ORDER BY position)
 )
 SELECT p.*, tr.key_move, tr.key_distance, tr.half_double,
        tr.bpm_diff::float AS bpm_diff, tr.bpm_change::float AS bpm_change,
        tr.bpm_diff <= %(tolerance)s::numeric AS tempo_ok, p.raw_letter = p.next_letter AS same_mode,
-       tr.compatible
+       tr.compatible, my_r.rating AS my_rating, my_r.comment AS my_comment
 FROM paired p
 LEFT JOIN LATERAL transition(p.raw_bpm, p.raw_num, p.raw_letter,
                              p.next_bpm, p.next_num, p.next_letter, %(tolerance)s::numeric) tr ON true
+{RATING_JOIN_SQL.format(from_col="p.id", to_col="p.next_track_id")}
 ORDER BY p.position
 """
 
@@ -266,6 +270,7 @@ class PlaylistRepository:
                     if r["key_distance"] is not None
                     else None
                 ),
+                my_rating=RatingRow(r["my_rating"], r["my_comment"]) if r["my_rating"] is not None else None,
             )
             for r in rows
         ]

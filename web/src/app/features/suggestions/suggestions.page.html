@@ -122,6 +122,11 @@
               </button>
               <app-play-button [trackId]="s.track_id" />
               <app-play-transition-button [fromId]="seed.id" [toId]="s.track_id" />
+              <app-transition-rating
+                [fromId]="seed.id"
+                [toId]="s.track_id"
+                [rating]="s.my_rating"
+              />
               <app-favorite-button [trackId]="s.track_id" [favorite]="s.favorite" />
               <app-add-to-playlist [trackId]="s.track_id" />
             </li>

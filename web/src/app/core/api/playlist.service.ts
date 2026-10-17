@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { CatalogTrack, KeyMove } from './catalog.service';
+import { CatalogTrack, KeyMove, TransitionRating } from './catalog.service';
 
 /** Une playlist ; source_provider null = créée ici, sinon importée (lecture seule). */
 export interface PlaylistSummary {
@@ -35,6 +35,8 @@ export interface PlaylistItem {
   position: number;
   track: CatalogTrack;
   transition_to_next: Transition | null;
+  /** Ma note de ce morceau vers le suivant, ou null. */
+  my_rating: TransitionRating | null;
 }
 
 /** Dernier export d'une playlist vers Spotify. */

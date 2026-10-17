@@ -200,6 +200,11 @@
                 <span data-testid="transition-text">{{ t.text }}</span>
                 @if (row.nextTrackId; as next) {
                   <app-play-transition-button [fromId]="row.item.track.id" [toId]="next" />
+                  <app-transition-rating
+                    [fromId]="row.item.track.id"
+                    [toId]="next"
+                    [rating]="row.item.my_rating"
+                  />
                 }
               </p>
             }

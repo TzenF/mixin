@@ -1,5 +1,13 @@
 <main>
   <h1>Playlists</h1>
+  @if (ratedCount() !== null) {
+    <p class="hint" data-testid="rated-count">
+      {{ ratedCount() }} enchaînement{{ ratedCount()! > 1 ? 's' : '' }} noté{{
+        ratedCount()! > 1 ? 's' : ''
+      }}
+      (il en faudra quelques dizaines pour régler le score des suggestions)
+    </p>
+  }
 
   <form class="create" (submit)="$event.preventDefault(); create(name)">
     <label>

@@ -240,6 +240,7 @@ describe('AudioPlayerService', () => {
       b.currentTime = TRANSITION.nextSeconds;
       vi.advanceTimersByTime(TRANSITION.tickMs);
       expect(player.current()).toBeNull(); // B s'arrête
+      expect(player.lastFinished()).toEqual({ fromId: 'a', toId: 'b' }); // invite à le noter
     });
 
     it('s’adapte à un extrait plus court que 30 s', async () => {

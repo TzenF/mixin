@@ -23,6 +23,7 @@ function detail(id: string, trackIds: string[]): PlaylistDetail {
       item_id: position,
       position,
       transition_to_next: null,
+      my_rating: null,
       track: {
         id: trackId,
         title: trackId,

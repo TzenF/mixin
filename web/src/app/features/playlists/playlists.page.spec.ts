@@ -45,10 +45,12 @@ describe('PlaylistsPage', () => {
   /** Affiche la page et répond à la requête de la liste. */
   async function render(
     respond: (req: ReturnType<HttpTestingController['expectOne']>) => void,
+    count = 0,
   ): Promise<ComponentFixture<PlaylistsPage>> {
     const fixture = TestBed.createComponent(PlaylistsPage);
     fixture.detectChanges();
     respond(http.expectOne('/api/playlists'));
+    http.expectOne('/api/transitions/ratings/count').flush({ count });
     await fixture.whenStable();
     return fixture;
   }
@@ -135,5 +137,10 @@ describe('PlaylistsPage', () => {
     http.expectOne('/api/playlists').flush([]);
     expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Set du samedi'));
     confirm.mockRestore();
+  });
+
+  it('affiche combien d’enchaînements j’ai notés', async () => {
+    const fixture = await render((req) => req.flush([SET]), 12);
+    expect(all(fixture, 'rated-count')[0].textContent).toContain('12 enchaînements notés');
   });
 });

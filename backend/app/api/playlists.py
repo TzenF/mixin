@@ -19,6 +19,7 @@ from app.api.deps import (
     get_spotify_provider,
 )
 from app.api.tracks import DEFAULT_BPM_TOLERANCE, CatalogTrack
+from app.api.transitions import RatingOut
 from app.services.playlist_editor import PlaylistEditor
 from app.services.playlist_export import PlaylistExporter
 from app.services.spotify_connection import SpotifyConnection
@@ -63,6 +64,7 @@ class PlaylistItem(BaseModel):
     position: int
     track: CatalogTrack
     transition_to_next: Transition | None
+    my_rating: RatingOut | None
 
 
 class SpotifyExport(BaseModel):
