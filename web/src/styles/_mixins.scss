@@ -144,6 +144,16 @@
   white-space: nowrap;
 }
 
+/// Fine barre d'avancement sous un bouton de lecture (largeur réglée en ligne : [style.width.%]).
+/// Le parent doit être en `position: relative`.
+@mixin progress-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: t.$border-width * 2;
+  background: var(--color-primary);
+}
+
 /// Texte secondaire, moins contrasté.
 @mixin text-muted {
   color: var(--color-text-muted);

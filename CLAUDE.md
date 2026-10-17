@@ -99,12 +99,15 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Morceaux compatibles | SQL `suggest_tracks(user, seed, tolerance, limit)`, via `TrackRepository.suggestions` (filtre « mes morceaux » appliqué avant la limite) |
 | SQL partagé du dépôt des morceaux | `track_repository.py` → `_ARTISTS_SQL` (artistes dans l'ordre), `_MINE_SQL` (« mes morceaux » = mes playlists + mes favoris), `_FAVORITE_SQL`, `_FAVORITES_ONLY_SQL` |
 | Favoris | `TrackRepository.set_favorite` ; routes `PUT` / `DELETE /tracks/{id}/favorite` ; champ `favorite` et filtre `favorites=true` (catalogue, suggestions) |
-| Styles | `web/src/styles/_tokens.scss`, `_mixins.scss` (`page`, `panel`, `status`, `reset-list`, `button-primary`, `button-secondary`, `icon-button`, `card-button`, `badge`, `field`, `filter-bar`, `focus-ring`, `text-muted`, `text-danger`) |
+| Styles | `web/src/styles/_tokens.scss`, `_mixins.scss` (`page`, `panel`, `status`, `reset-list`, `button-primary`, `button-secondary`, `icon-button`, `card-button`, `badge`, `progress-bar`, `field`, `filter-bar`, `focus-ring`, `text-muted`, `text-danger`) |
 | Message d'erreur d'API (front) | `web/src/app/core/api/api-error.ts` → `apiErrorMessage` |
 | Session côté front | `web/src/app/core/api/auth.service.ts` → `AuthService`, `SPOTIFY_LOGIN_URL` |
 | Playlists côté front | `web/src/app/core/api/playlist.service.ts` → `PlaylistService` |
 | Playlist « en cours » (front) | `web/src/app/core/current-playlist.service.ts` → `CurrentPlaylistService` ; pour les tests des pages : `FakeCurrentPlaylistService` (`current-playlist.service.fake.ts`) |
 | Bouton ★ / ☆ (front) | `web/src/app/shared/favorite-button/` |
+| URL d'un extrait Deezer (à l'écoute, jamais stockée) | `services/preview.py` → `PreviewService` ; route `GET /tracks/{id}/preview` (`no-store`, 404 avec `reason`, 503 si Deezer flanche) ; `DeezerClient.get_track`, `preview_expiry` |
+| Lecture des extraits (front, un seul son à la fois) | `web/src/app/core/audio-player.service.ts` → `AudioPlayerService` (`toggle`, `toggleTransition`, `AUDIO_FACTORY`) ; pour les tests : `FakeAudioPlayerService` |
+| Boutons ▶ / ⏸ et « Écouter l'enchaînement » | `web/src/app/shared/play-button/`, `web/src/app/shared/play-transition-button/` (`TRANSITION_DISCLAIMER`) |
 | Bouton « Corriger » (BPM ×2 / ÷2, tonalité, annuler) | `web/src/app/shared/track-correction/` (émet le morceau corrigé) |
 | Bouton « + Ajouter », barre « Playlist en cours » | `web/src/app/shared/add-to-playlist/`, `web/src/app/shared/current-playlist-bar/` |
 | Libellés et texte d'un enchaînement, écart de BPM signé (front) | `web/src/app/shared/key-moves.ts` → `KEY_MOVE_LABELS`, `formatBpmChange`, `describeTransition` |
@@ -221,6 +224,14 @@ réécrite se vérifie avant/après dans une transaction `REPEATABLE READ` (rés
   base 0, n'exécute pas leurs tâches.
 - **Écart de BPM : `bpm_diff` (absolu, sert au score) ≠ `bpm_change` (signé en %, sert à l'affichage)**. Un
   enchaînement refusé garde `key_distance` et `tempo_ok` / `same_mode` pour expliquer pourquoi.
+- **Extraits Deezer** : URL signée valable **15 min** (`hdnea=exp=…`, vérifié le 17/10/2026) → redemandée à
+  l'écoute, gardée seulement en mémoire de la page (jusqu'à 2 min avant l'expiration). Le CDN répond
+  `Access-Control-Allow-Origin: *` et accepte les `Range`. Le **navigateur** garde le MP3 dans son propre cache
+  (`max-age` ≈ 140 jours) : hors de notre serveur, la règle n°5 reste respectée. Fondu par le volume de deux
+  `<audio>` : coupure sèche sur iOS (volume non réglable par le code) ; Safari peut refuser `play()` après une
+  requête (non testé).
+- **Dans un test, `expect((a, b))` ne vérifie que `b`** (opérateur virgule) : comparer un tableau,
+  `expect([a, b]).toEqual([…])`.
 - **Formulaire avec nos propres messages d'erreur** : ajouter `novalidate`, sinon un `<input type="number" max>`
   bloque l'envoi (validation native du navigateur) avant notre contrôle.
 - **Fixtures `client` et `logged_in_client` = le même objet** (la seconde ajoute le cookie à la première) : pour
@@ -239,7 +250,8 @@ de la base) et masque `/docs`.
 Reste à faire au déploiement : vrais mots de passe Postgres et Redis, conteneurs non-root, pas de `--reload`
 ni de `watchfiles`, aucun port de base ou de Redis publié, reverse proxy HTTPS qui sert le front et `/api` sur
 la même origine, avec rate limiting sur `/auth/spotify/login` (sans session, il écrit une clé Redis à chaque
-appel) et en-têtes de sécurité (CSP, HSTS), sauvegardes PostgreSQL, worker sur x86_64.
+appel) et en-têtes de sécurité (CSP, HSTS ; la CSP doit autoriser `media-src https://cdnt-preview.dzcdn.net` pour les
+extraits), sauvegardes PostgreSQL, worker sur x86_64.
 
 ## Analyse audio (résultats des spikes, voir spikes/README.md)
 

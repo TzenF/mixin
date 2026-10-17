@@ -14,6 +14,11 @@ import {
 } from '../../core/api/catalog.service';
 import { AddToPlaylistComponent } from '../../shared/add-to-playlist/add-to-playlist.component';
 import { TrackCorrectionComponent } from '../../shared/track-correction/track-correction.component';
+import { PlayButtonComponent } from '../../shared/play-button/play-button.component';
+import {
+  PlayTransitionButtonComponent,
+  TRANSITION_DISCLAIMER,
+} from '../../shared/play-transition-button/play-transition-button.component';
 import { FavoriteButtonComponent } from '../../shared/favorite-button/favorite-button.component';
 import { CurrentPlaylistBarComponent } from '../../shared/current-playlist-bar/current-playlist-bar.component';
 import { KEY_MOVE_LABELS } from '../../shared/key-moves';
@@ -38,6 +43,8 @@ type State =
     CurrentPlaylistBarComponent,
     FavoriteButtonComponent,
     TrackCorrectionComponent,
+    PlayButtonComponent,
+    PlayTransitionButtonComponent,
   ],
   templateUrl: './suggestions.page.html',
   styleUrl: './suggestions.page.scss',
@@ -50,6 +57,7 @@ export class SuggestionsPage {
   protected readonly loginUrl = SPOTIFY_LOGIN_URL;
   protected readonly tolerances = TOLERANCES;
   protected readonly moveLabels = KEY_MOVE_LABELS;
+  protected readonly disclaimer = TRANSITION_DISCLAIMER;
 
   /** Morceau de départ (dans l'URL : /suggestions/:trackId). */
   private trackId = '';

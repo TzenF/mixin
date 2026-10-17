@@ -59,6 +59,7 @@
     <section class="seed" data-testid="seed">
       <p class="hint">Après</p>
       <p class="title">
+        <app-play-button [trackId]="seed.id" [noPreview]="seed.analysis_status === 'no_preview'" />
         <app-favorite-button [trackId]="seed.id" [favorite]="seed.favorite" />
         {{ seed.title }}
       </p>
@@ -98,6 +99,7 @@
           Aucun morceau compatible. Élargis l'écart de BPM ou affiche tous les morceaux.
         </p>
       } @else {
+        <p class="hint" data-testid="listen-disclaimer">🎧 {{ disclaimer }}</p>
         <ol data-testid="suggestions">
           @for (s of suggestions; track s.track_id) {
             <li class="suggestion-row">
@@ -118,6 +120,8 @@
                   }
                 </span>
               </button>
+              <app-play-button [trackId]="s.track_id" />
+              <app-play-transition-button [fromId]="seed.id" [toId]="s.track_id" />
               <app-favorite-button [trackId]="s.track_id" [favorite]="s.favorite" />
               <app-add-to-playlist [trackId]="s.track_id" />
             </li>

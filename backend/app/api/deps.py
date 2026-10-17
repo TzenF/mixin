@@ -7,6 +7,7 @@ import httpx
 from fastapi import Cookie, Depends, HTTPException, Request, status
 
 from app.adapters.db import Database
+from app.adapters.deezer_client import DeezerClient
 from app.adapters.oauth_state_store import OAuthStateStore
 from app.adapters.playlist_repository import PlaylistRepository
 from app.adapters.queue import TaskQueue
@@ -18,6 +19,7 @@ from app.config import Settings
 from app.services.playlist_editor import PlaylistEditor
 from app.services.playlist_export import PlaylistExporter
 from app.services.playlist_import import PlaylistImporter
+from app.services.preview import PreviewService
 from app.services.sessions import SessionService
 from app.services.spotify_connection import SpotifyConnection
 
@@ -115,3 +117,11 @@ def get_playlist_exporter(
 ) -> PlaylistExporter:
     """Fournit le service d'export des playlists vers Spotify."""
     return PlaylistExporter(db, provider)
+
+
+def get_preview_service(
+    tracks: Annotated[TrackRepository, Depends(get_track_repository)],
+    client: Annotated[httpx.AsyncClient, Depends(get_http_client)],
+) -> PreviewService:
+    """Fournit le service qui trouve l'URL de l'extrait Deezer d'un morceau."""
+    return PreviewService(tracks, DeezerClient(client))

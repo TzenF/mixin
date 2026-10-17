@@ -92,3 +92,19 @@ async def test_download_error_means_retry_later(tmp_path: Path) -> None:
     deezer = _deezer(lambda _req: httpx.Response(503))
     with pytest.raises(DeezerUnavailableError, match="503"):
         await deezer.download("https://cdn/x.mp3", tmp_path / "extrait.mp3")
+
+
+async def test_get_track_by_deezer_id() -> None:
+    def respond(request: httpx.Request) -> httpx.Response:
+        """Répond comme Deezer pour un identifiant connu."""
+        assert request.url.path == "/track/525334532"
+        return httpx.Response(200, json={"id": 525334532, "preview": "https://cdn/extrait.mp3"})
+
+    assert await _deezer(respond).get_track("525334532") == DeezerTrack(
+        "525334532", "https://cdn/extrait.mp3"
+    )
+
+
+async def test_get_track_gone_from_deezer() -> None:
+    body = {"error": {"type": "DataException", "message": "no data", "code": 800}}
+    assert await _deezer(lambda _req: httpx.Response(200, json=body)).get_track("1") is None

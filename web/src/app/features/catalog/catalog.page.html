@@ -115,7 +115,7 @@
       <table data-testid="tracks">
         <thead>
           <tr>
-            <th scope="col" aria-label="Favori"></th>
+            <th scope="col" aria-label="Écouter et favori"></th>
             <th scope="col">Titre</th>
             <th scope="col">Artistes</th>
             <th scope="col" class="number">BPM</th>
@@ -128,6 +128,10 @@
           @for (track of page.items; track track.id) {
             <tr data-testid="track-row">
               <td>
+                <app-play-button
+                  [trackId]="track.id"
+                  [noPreview]="track.analysis_status === 'no_preview'"
+                />
                 <app-favorite-button [trackId]="track.id" [favorite]="track.favorite" />
               </td>
               <td>{{ track.title }}</td>

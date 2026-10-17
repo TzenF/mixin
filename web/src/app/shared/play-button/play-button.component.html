@@ -1,0 +1,15 @@
+<button
+  type="button"
+  [disabled]="disabled()"
+  [title]="hint()"
+  [attr.aria-label]="hint()"
+  [attr.aria-pressed]="playing()"
+  [class.error]="error() !== null"
+  (click)="toggle()"
+  data-testid="play"
+>
+  {{ loading() ? '…' : playing() ? '⏸' : '▶' }}
+</button>
+@if (isCurrent()) {
+  <span class="progress" data-testid="play-progress" [style.width.%]="progress() * 100"></span>
+}

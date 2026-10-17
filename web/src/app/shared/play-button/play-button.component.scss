@@ -1,0 +1,20 @@
+@use 'mixins' as m;
+@use 'tokens' as t;
+
+:host {
+  position: relative;
+  display: inline-block;
+}
+
+button {
+  @include m.icon-button;
+  margin-left: 0;
+
+  &.error {
+    @include m.text-danger;
+  }
+}
+
+.progress {
+  @include m.progress-bar;
+}

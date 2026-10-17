@@ -61,6 +61,12 @@ export interface CorrectionChanges {
   key?: string | null;
 }
 
+/** URL d'un extrait Deezer, à lire tout de suite ; expires_at null = expiration inconnue. */
+export interface Preview {
+  url: string;
+  expires_at: string | null;
+}
+
 /** Tonalité affichée après une correction perso. */
 export interface KeyCorrected {
   camelot: string;
@@ -150,5 +156,10 @@ export class CatalogService {
       `/api/tracks/${encodeURIComponent(trackId)}/correction`,
       changes,
     );
+  }
+
+  /** URL neuve de l'extrait (valable ~15 min) ; 404 avec `reason` s'il n'y en a pas, 503 si Deezer flanche. */
+  preview(trackId: string): Observable<Preview> {
+    return this.http.get<Preview>(`/api/tracks/${encodeURIComponent(trackId)}/preview`);
   }
 }

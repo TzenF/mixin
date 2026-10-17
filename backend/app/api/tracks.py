@@ -1,6 +1,7 @@
 """Routes des morceaux : catalogue, suggestions, demande d'analyse (utilisateurs connectés seulement)."""
 
 from dataclasses import asdict
+from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -10,8 +11,9 @@ from pydantic import BaseModel, Field
 from app.adapters.db import Database
 from app.adapters.queue import TaskQueue
 from app.adapters.track_repository import CatalogFilters, CatalogSort, TrackRepository
-from app.api.deps import get_current_user_id, get_db, get_queue, get_track_repository
+from app.api.deps import get_current_user_id, get_db, get_preview_service, get_queue, get_track_repository
 from app.domain.camelot import CamelotKey
+from app.services.preview import PreviewService
 from app.services.track_correction import (
     BPM_MAX,
     BPM_MIN,
@@ -233,3 +235,26 @@ async def remove_favorite(track_id: UUID, tracks: Tracks, user_id: CurrentUser) 
     """Retire le morceau de mes favoris (sans effet s'il n'y est pas)."""
     await tracks.set_favorite(user_id, track_id, favorite=False)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+class PreviewOut(BaseModel):
+    """URL de l'extrait Deezer, à lire tout de suite par le navigateur ; expires_at null = inconnue."""
+
+    url: str
+    expires_at: datetime | None
+
+
+@router.get("/{track_id}/preview")
+async def track_preview(
+    track_id: UUID,
+    tracks: Tracks,
+    _user_id: CurrentUser,
+    previews: Annotated[PreviewService, Depends(get_preview_service)],
+    response: Response,
+) -> PreviewOut:
+    """URL neuve de l'extrait (~15 min) ; 404 avec la raison s'il n'y en a pas ; 503 si Deezer flanche."""
+    await _ensure_exists(tracks, track_id)
+    preview = await previews.preview(track_id)
+    # L'URL va expirer : le navigateur ne doit pas garder cette réponse.
+    response.headers["Cache-Control"] = "no-store"
+    return PreviewOut(url=preview.url, expires_at=preview.expires_at)

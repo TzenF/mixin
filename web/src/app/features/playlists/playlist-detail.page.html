@@ -137,6 +137,7 @@
     @if (playlist.items.length === 0) {
       <p class="hint" data-testid="empty">Cette playlist est vide.</p>
     } @else {
+      <p class="hint" data-testid="listen-disclaimer">🎧 {{ disclaimer }}</p>
       <ol
         cdkDropList
         [cdkDropListData]="playlist.items"
@@ -157,6 +158,10 @@
                 >
               }
               <span class="index">{{ i + 1 }}</span>
+              <app-play-button
+                [trackId]="row.item.track.id"
+                [noPreview]="row.item.track.analysis_status === 'no_preview'"
+              />
               <app-favorite-button
                 [trackId]="row.item.track.id"
                 [favorite]="row.item.track.favorite"
@@ -191,7 +196,12 @@
               <app-track-correction [track]="row.item.track" (corrected)="onCorrected()" />
             </div>
             @if (row.transition; as t) {
-              <p [class]="'transition ' + t.kind" data-testid="transition">{{ t.text }}</p>
+              <p [class]="'transition ' + t.kind" data-testid="transition">
+                <span data-testid="transition-text">{{ t.text }}</span>
+                @if (row.nextTrackId; as next) {
+                  <app-play-transition-button [fromId]="row.item.track.id" [toId]="next" />
+                }
+              </p>
             }
           </li>
         }

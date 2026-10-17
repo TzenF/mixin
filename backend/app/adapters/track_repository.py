@@ -254,6 +254,15 @@ class TrackRepository:
         assert row is not None
         return row["id"]
 
+    async def find_external_id(self, track_id: UUID, provider: str) -> str | None:
+        """Identifiant du morceau chez ce service musical, ou None."""
+        row = await self._db.fetch_one(
+            """SELECT external_id FROM track_external_id
+               WHERE track_id = %(track_id)s AND provider = %(provider)s::music_provider""",
+            {"track_id": track_id, "provider": provider},
+        )
+        return row["external_id"] if row else None
+
     async def add_external_id(self, track_id: UUID, provider: str, external_id: str) -> None:
         """Associe un identifiant externe au morceau ; sans effet s'il en a déjà un pour ce service."""
         await self._db.fetch_one(

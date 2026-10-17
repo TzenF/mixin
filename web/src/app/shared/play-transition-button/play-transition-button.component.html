@@ -1,0 +1,18 @@
+<button
+  type="button"
+  class="transition"
+  [title]="hint()"
+  [attr.aria-label]="hint()"
+  [attr.aria-pressed]="isCurrent()"
+  [class.error]="error() !== null"
+  (click)="toggle()"
+  data-testid="play-transition"
+>
+  {{ loading() ? '… Chargement' : isCurrent() ? '■ Arrêter' : "▶ Écouter l'enchaînement" }}
+</button>
+@if (isCurrent()) {
+  <span class="progress" [style.width.%]="progress() * 100"></span>
+}
+@if (error(); as e) {
+  <span class="error-text" data-testid="transition-error">{{ e.message }}</span>
+}

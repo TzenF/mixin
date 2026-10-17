@@ -10,6 +10,8 @@ import { CatalogPage as Page, CatalogTrack } from '../../core/api/catalog.servic
 import { CatalogPage, SEARCH_DELAY_MS } from './catalog.page';
 import { CurrentPlaylistService } from '../../core/current-playlist.service';
 import { FakeCurrentPlaylistService } from '../../core/current-playlist.service.fake';
+import { AudioPlayerService } from '../../core/audio-player.service';
+import { FakeAudioPlayerService } from '../../core/audio-player.service.fake';
 
 const ALPHA: CatalogTrack = {
   id: 'a',
@@ -45,6 +47,7 @@ describe('CatalogPage', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: CurrentPlaylistService, useValue: new FakeCurrentPlaylistService() },
+        { provide: AudioPlayerService, useValue: new FakeAudioPlayerService() },
         { provide: Router, useValue: { navigate } },
         {
           provide: ActivatedRoute,
@@ -257,6 +260,18 @@ describe('CatalogPage', () => {
     expect(row.querySelector('[data-testid="bpm-corrected"]')).not.toBeNull();
   });
 
+  it('propose ▶ sur chaque ligne, désactivé pour un morceau sans extrait', async () => {
+    setup();
+    const fixture = await render({
+      total: 2,
+      items: [ALPHA, { ...PENDING, analysis_status: 'no_preview' }],
+    });
+    const buttons = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
+      '[data-testid="track-row"] [data-testid="play"]',
+    );
+    expect(Array.from(buttons).map((b) => b.disabled)).toEqual([false, true]);
+  });
+
   it('signale quand aucun morceau ne correspond', async () => {
     setup();
     const fixture = await render({ total: 0, items: [] });
@@ -318,6 +333,7 @@ describe('CatalogPage — inversion majeur/mineur', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: CurrentPlaylistService, useValue: new FakeCurrentPlaylistService() },
+        { provide: AudioPlayerService, useValue: new FakeAudioPlayerService() },
         { provide: Router, useValue: { navigate: vi.fn().mockResolvedValue(true) } },
         {
           provide: ActivatedRoute,

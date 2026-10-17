@@ -1,0 +1,27 @@
+@use 'mixins' as m;
+@use 'tokens' as t;
+
+:host {
+  position: relative;
+  display: inline-block;
+}
+
+button {
+  @include m.button-secondary;
+  padding: 0 t.$space-2;
+  font-size: t.$font-size-sm;
+
+  &.error {
+    @include m.text-danger;
+  }
+}
+
+.progress {
+  @include m.progress-bar;
+}
+
+.error-text {
+  @include m.text-danger;
+  margin-left: t.$space-2;
+  font-size: t.$font-size-sm;
+}

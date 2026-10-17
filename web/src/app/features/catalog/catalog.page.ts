@@ -15,6 +15,7 @@ import {
 } from '../../core/api/catalog.service';
 import { AddToPlaylistComponent } from '../../shared/add-to-playlist/add-to-playlist.component';
 import { TrackCorrectionComponent } from '../../shared/track-correction/track-correction.component';
+import { PlayButtonComponent } from '../../shared/play-button/play-button.component';
 import { FavoriteButtonComponent } from '../../shared/favorite-button/favorite-button.component';
 import { CurrentPlaylistBarComponent } from '../../shared/current-playlist-bar/current-playlist-bar.component';
 
@@ -46,6 +47,7 @@ type State =
     CurrentPlaylistBarComponent,
     FavoriteButtonComponent,
     TrackCorrectionComponent,
+    PlayButtonComponent,
   ],
   templateUrl: './catalog.page.html',
   styleUrl: './catalog.page.scss',

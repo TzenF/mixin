@@ -7,7 +7,9 @@ en HTTP 200 avec un objet `error` ; le code 800 (« no data ») veut dire « ISR
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import quote, urlsplit
 
@@ -46,7 +48,15 @@ class DeezerClient:
     async def find_by_isrc(self, isrc: str) -> DeezerTrack | None:
         """Cherche le morceau par ISRC ; None si Deezer ne le connaît pas."""
         # L'ISRC vient de Spotify : encodé pour qu'un « / » ou un « ? » ne change pas l'URL appelée.
-        data = (await self._get(f"{DEEZER_API}/track/isrc:{quote(isrc, safe='')}")).json()
+        return await self._track(f"{DEEZER_API}/track/isrc:{quote(isrc, safe='')}")
+
+    async def get_track(self, deezer_id: str) -> DeezerTrack | None:
+        """Relit un morceau par son identifiant Deezer (URL d'extrait neuve) ; None s'il n'existe plus."""
+        return await self._track(f"{DEEZER_API}/track/{quote(deezer_id, safe='')}")
+
+    async def _track(self, url: str) -> DeezerTrack | None:
+        """Appelle /track/… et lit la réponse ; None pour « no data » (code 800), sinon erreur à réessayer."""
+        data = (await self._get(url)).json()
         if error := data.get("error"):
             if error.get("code") == _NO_DATA:
                 return None
@@ -85,3 +95,9 @@ class DeezerClient:
         if resp.status_code != 200:
             raise DeezerUnavailableError(f"Deezer a répondu HTTP {resp.status_code}")
         return resp
+
+
+def preview_expiry(url: str) -> datetime | None:
+    """Date d'expiration d'une URL d'extrait (jeton `hdnea=exp=…`, environ 15 min) ; None si illisible."""
+    match = re.search(r"[?&]hdnea=exp=(\d+)", url)
+    return datetime.fromtimestamp(int(match.group(1)), UTC) if match else None

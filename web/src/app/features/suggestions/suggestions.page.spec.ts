@@ -7,6 +7,8 @@ import { CatalogTrack, Suggestion } from '../../core/api/catalog.service';
 import { SuggestionsPage } from './suggestions.page';
 import { CurrentPlaylistService } from '../../core/current-playlist.service';
 import { FakeCurrentPlaylistService } from '../../core/current-playlist.service.fake';
+import { AudioPlayerService } from '../../core/audio-player.service';
+import { FakeAudioPlayerService } from '../../core/audio-player.service.fake';
 
 const SEED: CatalogTrack = {
   id: 'seed',
@@ -55,6 +57,7 @@ describe('SuggestionsPage', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: CurrentPlaylistService, useValue: new FakeCurrentPlaylistService() },
+        { provide: AudioPlayerService, useValue: new FakeAudioPlayerService() },
         { provide: Router, useValue: { navigate } },
         {
           provide: ActivatedRoute,
@@ -224,6 +227,24 @@ describe('SuggestionsPage', () => {
 
     await answer(fixture, { ...SEED, bpm: 248, bpm_source: 'manual' }, []);
     expect(byTestId(fixture, 'seed-bpm')?.textContent).toContain('248.0');
+  });
+
+  it('propose d’écouter le départ, chaque suggestion et l’enchaînement', async () => {
+    setup();
+    const fixture = create();
+    await answer(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    expect(root.querySelectorAll('[data-testid="seed"] [data-testid="play"]').length).toBe(1);
+    expect(root.querySelectorAll('.suggestion-row [data-testid="play"]').length).toBe(2);
+    root
+      .querySelector<HTMLButtonElement>('.suggestion-row [data-testid="play-transition"]')!
+      .click();
+    const player = TestBed.inject(AudioPlayerService) as unknown as FakeAudioPlayerService;
+    expect(player.calls).toEqual(['transition:seed>rock']);
+    expect(root.querySelector('[data-testid="listen-disclaimer"]')?.textContent).toContain(
+      'pas la vraie fin',
+    );
   });
 
   it('signale quand aucun morceau n’est compatible', async () => {

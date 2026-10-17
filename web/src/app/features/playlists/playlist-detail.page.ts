@@ -21,6 +21,11 @@ import {
 import { CurrentPlaylistService } from '../../core/current-playlist.service';
 import { FileDownloadService } from '../../core/file-download.service';
 import { TrackCorrectionComponent } from '../../shared/track-correction/track-correction.component';
+import { PlayButtonComponent } from '../../shared/play-button/play-button.component';
+import {
+  PlayTransitionButtonComponent,
+  TRANSITION_DISCLAIMER,
+} from '../../shared/play-transition-button/play-transition-button.component';
 import { FavoriteButtonComponent } from '../../shared/favorite-button/favorite-button.component';
 import { describeTransition } from '../../shared/key-moves';
 import { PlaylistTextFormat, playlistFileName, playlistText } from '../../shared/playlist-text';
@@ -43,6 +48,8 @@ type State =
     CdkDragHandle,
     FavoriteButtonComponent,
     TrackCorrectionComponent,
+    PlayButtonComponent,
+    PlayTransitionButtonComponent,
   ],
   templateUrl: './playlist-detail.page.html',
   styleUrl: './playlist-detail.page.scss',
@@ -55,6 +62,7 @@ export class PlaylistDetailPage {
   private readonly playlistId = inject(ActivatedRoute).snapshot.paramMap.get('playlistId') ?? '';
 
   protected readonly loginUrl = SPOTIFY_LOGIN_URL;
+  protected readonly disclaimer = TRANSITION_DISCLAIMER;
   protected readonly state = signal<State>({ kind: 'loading' });
   /** Vrai pendant la modification du nom. */
   protected readonly renaming = signal(false);
@@ -77,6 +85,7 @@ export class PlaylistDetailPage {
     return items.map((item, i) => ({
       item,
       transition: i < items.length - 1 ? describeTransition(item.transition_to_next) : null,
+      nextTrackId: items[i + 1]?.track.id ?? null,
     }));
   });
 

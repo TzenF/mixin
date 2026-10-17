@@ -5,6 +5,7 @@ import logging
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
+from app.adapters.deezer_client import DeezerUnavailableError
 from app.adapters.spotify_auth import SpotifyAuthError
 from app.adapters.spotify_provider import SpotifyApiError
 from app.adapters.token_cipher import TokenCipherError
@@ -15,6 +16,7 @@ from app.services.playlist_editor import (
     PlaylistReadOnlyError,
     TrackMissingError,
 )
+from app.services.preview import PreviewUnavailableError
 
 log = logging.getLogger(__name__)
 
@@ -58,6 +60,21 @@ async def _stale_order(request: Request, exc: Exception) -> JSONResponse:
     return JSONResponse({"detail": str(exc)}, status_code=status.HTTP_422_UNPROCESSABLE_CONTENT)
 
 
+async def _no_preview(request: Request, exc: Exception) -> JSONResponse:
+    """Réponse 404 : pas d'extrait pour ce morceau, avec la raison (`reason`)."""
+    assert isinstance(exc, PreviewUnavailableError)
+    return JSONResponse({"detail": str(exc), "reason": exc.reason}, status_code=status.HTTP_404_NOT_FOUND)
+
+
+async def _deezer_down(request: Request, exc: Exception) -> JSONResponse:
+    """Réponse 503 : Deezer ne répond pas pour l'instant (sans détail : une URL signée pourrait fuiter)."""
+    log.warning("Deezer indisponible : %s", exc.__class__.__name__)
+    return JSONResponse(
+        {"detail": "Deezer est indisponible pour l'instant : réessaie dans un moment"},
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+    )
+
+
 def register_error_handlers(app: FastAPI) -> None:
     """Branche les gestionnaires d'erreurs sur l'application."""
     app.add_exception_handler(MusicProviderError, _music_provider_error)
@@ -66,3 +83,5 @@ def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(TrackMissingError, _not_found)
     app.add_exception_handler(PlaylistReadOnlyError, _read_only)
     app.add_exception_handler(OrderMismatchError, _stale_order)
+    app.add_exception_handler(PreviewUnavailableError, _no_preview)
+    app.add_exception_handler(DeezerUnavailableError, _deezer_down)

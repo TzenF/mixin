@@ -10,6 +10,8 @@ import { describeTransition } from '../../shared/key-moves';
 import { PlaylistDetailPage } from './playlist-detail.page';
 import { CurrentPlaylistService } from '../../core/current-playlist.service';
 import { FakeCurrentPlaylistService } from '../../core/current-playlist.service.fake';
+import { AudioPlayerService } from '../../core/audio-player.service';
+import { FakeAudioPlayerService } from '../../core/audio-player.service.fake';
 import { FileDownloadService } from '../../core/file-download.service';
 
 const TRACK: CatalogTrack = {
@@ -107,16 +109,19 @@ describe('PlaylistDetailPage', () => {
   let http: HttpTestingController;
   let navigate: ReturnType<typeof vi.fn>;
   let saveText: ReturnType<typeof vi.fn>;
+  let player: FakeAudioPlayerService;
 
   beforeEach(() => {
     navigate = vi.fn().mockResolvedValue(true);
     saveText = vi.fn();
+    player = new FakeAudioPlayerService();
     TestBed.configureTestingModule({
       imports: [PlaylistDetailPage],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: CurrentPlaylistService, useValue: new FakeCurrentPlaylistService() },
+        { provide: AudioPlayerService, useValue: player },
         { provide: FileDownloadService, useValue: { saveText } },
         { provide: Router, useValue: { navigate } },
         {
@@ -157,7 +162,7 @@ describe('PlaylistDetailPage', () => {
       'Trop rapide',
     ]);
     const transitions = all(fixture, 'transition');
-    expect(transitions.map((t) => t.textContent?.trim())).toEqual([
+    expect(all(fixture, 'transition-text').map((t) => t.textContent?.trim())).toEqual([
       '→ +0,8 % · Tonalité voisine',
       '⚠ tempo +8,0 %',
     ]);
@@ -389,5 +394,16 @@ describe('PlaylistDetailPage', () => {
 
     http.expectOne('/api/playlists/set').flush(PLAYLIST); // rechargement discret
     expect(all(fixture, 'loading').length).toBe(0);
+  });
+
+  it('propose d’écouter chaque morceau et chaque enchaînement (pas après le dernier)', async () => {
+    const fixture = await render((req) => req.flush(PLAYLIST));
+    expect(all(fixture, 'play').length).toBe(3);
+    const transitions = all(fixture, 'play-transition');
+    expect(transitions.length).toBe(2);
+
+    transitions[1].click();
+    expect(player.calls).toEqual(['transition:t2>t3']);
+    expect(all(fixture, 'listen-disclaimer')[0].textContent).toContain('pas la vraie fin');
   });
 });
