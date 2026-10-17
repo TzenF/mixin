@@ -284,9 +284,11 @@ V2, dans l'ordre (une étape à la fois, plan validé avant de coder) :
    sont les favoris) ; compteur sur la page Playlists ; rendu à soigner plus tard. Le score n'est pas modifié tant
    qu'il n'y a pas quelques dizaines de notes. Pas de photo de l'enchaînement au moment de la note : l'analyse
    recalculera les composantes avec `transition` et les valeurs actuelles (corrigées).
-3. **Énergie** : d'abord un spike (mesures Essentia comparées à mon classement de « vib »), puis colonne,
-   `effective_features`, réanalyse, filtre, courbe d'énergie, sens monter / tenir / redescendre.
-   Limite : l'énergie de 30 s d'extrait n'est pas celle du morceau entier.
+3. **Énergie : mise de côté (17/10/2026)**, à reprendre plus tard. Plan du spike prêt : noter à l'aveugle (1 à 5)
+   l'énergie des 32 morceaux de « vib », puis comparer (corrélation de Spearman) sonie EBU R128, RMS, danceability,
+   taux d'attaques, centroïde spectral, complexité dynamique, un composite, et le BPM seul comme référence ; extraits
+   analysés puis supprimés. Ensuite seulement : colonne, `effective_features`, réanalyse, filtre, courbe d'énergie,
+   sens monter / tenir / redescendre. Limite : l'énergie de 30 s d'extrait n'est pas celle du morceau entier.
 4. **Filtre « BPM suspects »** (demi ou double tempo probable), corrigeable avec ×2 / ÷2. Peut s'intercaler.
 
 Prochaines idées (à décider) : corrections globales (admin).
