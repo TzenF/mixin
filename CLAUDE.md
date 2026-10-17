@@ -257,7 +257,9 @@ playlists, worker d'analyse (Deezer + Essentia), catalogue filtrable (page `/cat
 « inverser majeur/mineur », page d'accueil, page Suggestions (`/suggestions/:trackId`, enchaînement au clic), playlists (lecture avec
 la qualité des enchaînements, playlist en cours + « + Ajouter », glisser-déposer `@angular/cdk`), export vers
 Spotify (playlist privée, réexport = mise à jour), export TXT (détaillé ou tracklist),
-favoris (★, filtre, comptent dans « mes morceaux » ; pas d'import des titres likés Spotify). **Non vérifié** : la playlist exportée apparaît dans rekordbox.
+favoris (★, filtre, comptent dans « mes morceaux » ; pas d'import des titres likés Spotify).
+**Vérifié en réel le 17/10/2026** : export vers Spotify, mise à jour de la même playlist au réexport, et
+playlist (privée) visible dans rekordbox.
 **V1 terminée** avec les corrections manuelles (BPM avec ×2 / ÷2, tonalité, annuler ma correction).
 Prochaines idées (à décider) : filtre « BPM suspects » (demi/double tempo), corrections globales (admin).
 
