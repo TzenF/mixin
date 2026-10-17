@@ -48,12 +48,3 @@ li {
   padding: t.$space-1 t.$space-2;
   border-radius: t.$radius-sm;
 }
-
-button,
-.button {
-  @include m.button-primary;
-}
-
-button.secondary {
-  @include m.button-secondary;
-}

@@ -2,9 +2,8 @@
 
 button {
   @include m.icon-button;
-  margin-left: 0;
 
   &.on {
-    color: var(--color-primary);
+    @include m.icon-button-on;
   }
 }

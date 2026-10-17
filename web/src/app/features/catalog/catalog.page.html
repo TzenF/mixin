@@ -98,7 +98,7 @@
     }
     @case ('disconnected') {
       <p class="hint">Connecte-toi avec Spotify pour voir ton catalogue.</p>
-      <a class="button" [href]="loginUrl" data-testid="connect-spotify">Connecter Spotify</a>
+      <a class="button accent" [href]="loginUrl" data-testid="connect-spotify">Connecter Spotify</a>
     }
     @case ('error') {
       <p class="error" data-testid="error">{{ errorMessage() }}</p>
@@ -128,11 +128,13 @@
           @for (track of page.items; track track.id) {
             <tr data-testid="track-row">
               <td>
-                <app-play-button
-                  [trackId]="track.id"
-                  [noPreview]="track.analysis_status === 'no_preview'"
-                />
-                <app-favorite-button [trackId]="track.id" [favorite]="track.favorite" />
+                <span class="toolbar">
+                  <app-play-button
+                    [trackId]="track.id"
+                    [noPreview]="track.analysis_status === 'no_preview'"
+                  />
+                  <app-favorite-button [trackId]="track.id" [favorite]="track.favorite" />
+                </span>
               </td>
               <td>{{ track.title }}</td>
               <td class="muted">{{ track.artists.join(', ') }}</td>
@@ -145,23 +147,25 @@
                 }
               </td>
               <td class="key">
-                <span data-testid="camelot">{{ track.camelot ?? '—' }}</span>
-                @if (track.key_source === 'manual') {
-                  <span class="corrected" data-testid="corrected" title="Corrigée par toi"
-                    >corrigée</span
+                <span class="toolbar">
+                  <span data-testid="camelot">{{ track.camelot ?? '—' }}</span>
+                  @if (track.key_source === 'manual') {
+                    <span class="corrected" data-testid="corrected" title="Corrigée par toi"
+                      >corrigée</span
+                    >
+                  }
+                  <button
+                    type="button"
+                    class="flip"
+                    title="Inverser majeur/mineur (même tonique)"
+                    aria-label="Inverser majeur/mineur"
+                    [disabled]="track.camelot === null || flipping() === track.id"
+                    (click)="flipMode(track)"
+                    data-testid="flip-mode"
                   >
-                }
-                <button
-                  type="button"
-                  class="flip"
-                  title="Inverser majeur/mineur (même tonique)"
-                  aria-label="Inverser majeur/mineur"
-                  [disabled]="track.camelot === null || flipping() === track.id"
-                  (click)="flipMode(track)"
-                  data-testid="flip-mode"
-                >
-                  ⇄
-                </button>
+                    ⇄
+                  </button>
+                </span>
               </td>
               <td>
                 <span [class]="'badge ' + track.analysis_status" data-testid="status-badge">
@@ -169,16 +173,18 @@
                 </span>
               </td>
               <td>
-                <button
-                  type="button"
-                  class="secondary"
-                  (click)="openSuggestions(track)"
-                  data-testid="open-suggestions"
-                >
-                  Suggestions
-                </button>
-                <app-add-to-playlist [trackId]="track.id" />
-                <app-track-correction [track]="track" (corrected)="onCorrected($event)" />
+                <span class="toolbar">
+                  <button
+                    type="button"
+                    class="secondary"
+                    (click)="openSuggestions(track)"
+                    data-testid="open-suggestions"
+                  >
+                    Suggestions
+                  </button>
+                  <app-add-to-playlist [trackId]="track.id" />
+                  <app-track-correction [track]="track" (corrected)="onCorrected($event)" />
+                </span>
               </td>
             </tr>
           }

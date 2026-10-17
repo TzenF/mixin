@@ -6,17 +6,15 @@
   flex-wrap: wrap;
   align-items: center;
   gap: t.$space-1;
-  margin-left: t.$space-2;
 
   &.invite {
     @include m.badge;
-    @include m.status(success);
+    @include m.status(accent);
   }
 }
 
 button.value {
   @include m.icon-button;
-  margin-left: 0;
 
   &.on {
     @include m.button-primary;

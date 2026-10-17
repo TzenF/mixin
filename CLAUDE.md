@@ -49,6 +49,14 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 - Les motifs de style viennent de `web/src/styles/_mixins.scss` : `@use 'mixins' as m;` puis `@include m.panel;`.
   Un motif utilisé par deux composants **devient un mixin** dans ce fichier, avec un commentaire `///`.
 - Couleurs = variables CSS (`var(--color-…)`), pour permettre un thème sombre plus tard.
+- **Boutons de base définis une seule fois** dans `web/src/styles.scss` : `button` / `.button` (bleu), `.secondary`
+  (encadré), `.accent` (jaune, **une** action phare par page). Les pages ne les redéfinissent pas (sinon le même CSS
+  est recopié dans chaque page et dépasse le budget de 4 ko). Un composant qui veut autre chose (carte cliquable,
+  petit bouton ▶ ★…) le redéfinit dans son style, en fixant aussi son fond au survol.
+- Boutons et champs ont la même hauteur (`$control-height`, `$control-height-sm`, mixin `control`) ; les groupes
+  d'actions utilisent le mixin `toolbar` (espacement par `gap`, pas de `margin-left` dans les boutons).
+- Thème **temporaire** bleu et jaune (17/10/2026), en attendant la maquette Figma : on le remplace dans les tokens
+  et les mixins, pas dans les pages. Jamais de texte jaune sur fond clair (≈ 1,6:1).
 
 ### Python (backend)
 - Annotations de type partout. Modèles Pydantic pour les entrées/sorties de l'API.
@@ -99,9 +107,10 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Morceaux compatibles | SQL `suggest_tracks(user, seed, tolerance, limit)`, via `TrackRepository.suggestions` (filtre « mes morceaux » appliqué avant la limite) |
 | SQL partagé du dépôt des morceaux | `track_repository.py` → `_ARTISTS_SQL` (artistes dans l'ordre), `_MINE_SQL` (« mes morceaux » = mes playlists + mes favoris), `_FAVORITE_SQL`, `_FAVORITES_ONLY_SQL` |
 | Favoris | `TrackRepository.set_favorite` ; routes `PUT` / `DELETE /tracks/{id}/favorite` ; champ `favorite` et filtre `favorites=true` (catalogue, suggestions) |
-| Styles | `web/src/styles/_tokens.scss`, `_mixins.scss` (`page`, `panel`, `status`, `reset-list`, `button-primary`, `button-secondary`, `icon-button`, `card-button`, `badge`, `progress-bar`, `field`, `filter-bar`, `focus-ring`, `text-muted`, `text-danger`) |
+| Styles | `web/src/styles/_tokens.scss`, `_mixins.scss` (`page`, `panel`, `status`, `reset-list`, `control`, `button-primary`, `button-secondary`, `button-accent`, `icon-button`, `icon-button-on`, `toolbar`, `card-button`, `badge`, `status(success | danger | accent)`, `progress-bar`, `field`, `filter-bar`, `focus-ring`, `text-muted`, `text-danger`) |
 | Message d'erreur d'API (front) | `web/src/app/core/api/api-error.ts` → `apiErrorMessage` |
 | Session côté front | `web/src/app/core/api/auth.service.ts` → `AuthService`, `SPOTIFY_LOGIN_URL` |
+| Menu principal | `web/src/app/app.ts` → `NAV_LINKS` (ajouter une page ici et dans `app.routes.ts`) |
 | Playlists côté front | `web/src/app/core/api/playlist.service.ts` → `PlaylistService` |
 | Playlist « en cours » (front) | `web/src/app/core/current-playlist.service.ts` → `CurrentPlaylistService` ; pour les tests des pages : `FakeCurrentPlaylistService` (`current-playlist.service.fake.ts`) |
 | Bouton ★ / ☆ (front) | `web/src/app/shared/favorite-button/` |

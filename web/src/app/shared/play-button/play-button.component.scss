@@ -8,7 +8,10 @@
 
 button {
   @include m.icon-button;
-  margin-left: 0;
+
+  &.on {
+    @include m.icon-button-on;
+  }
 
   &.error {
     @include m.text-danger;

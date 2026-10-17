@@ -2,7 +2,7 @@
 @use 'tokens' as t;
 
 main {
-  @include m.page(t.$width-narrow);
+  @include m.page;
 }
 
 .hint {
@@ -41,6 +41,7 @@ li {
 
 .suggestion-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: t.$space-2;
 }
@@ -62,15 +63,10 @@ button.suggestion {
   margin-left: t.$space-1;
 }
 
-button,
-.button {
-  @include m.button-primary;
-}
-
-button.secondary {
-  @include m.button-secondary;
-}
-
 button.flip {
   @include m.icon-button;
+}
+
+.toolbar {
+  @include m.toolbar;
 }

@@ -1,5 +1,6 @@
 // Styles globaux : thème et base. Le reste vit dans les composants, via les mixins (src/styles/_mixins.scss).
 @use 'tokens' as t;
+@use 'mixins' as m;
 
 :root {
   @include t.theme-light;
@@ -7,8 +8,37 @@
 
 body {
   margin: 0;
+  min-height: 100vh;
+  line-height: 1.5;
   font-family: t.$font-family;
   font-size: t.$font-size-md;
   color: var(--color-text);
   background: var(--color-bg);
+}
+
+h1 {
+  margin: 0 0 t.$space-4;
+  color: var(--color-text);
+}
+
+a {
+  color: var(--color-primary);
+}
+
+// Boutons de base, définis UNE fois pour toute l'application (sinon chaque page recopie le même CSS).
+// Variantes par classe : .secondary (encadré), .accent (jaune, une seule action phare par page).
+// Un composant qui veut autre chose (carte cliquable, petit bouton ▶ ★…) le redéfinit dans son propre style.
+button,
+.button {
+  @include m.button-primary;
+}
+
+button.secondary,
+.button.secondary {
+  @include m.button-secondary;
+}
+
+button.accent,
+.button.accent {
+  @include m.button-accent;
 }

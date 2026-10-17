@@ -1,10 +1,27 @@
 import { Component } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
-/** Composant racine : affiche la page correspondant à l'URL. */
+/** Une entrée du menu principal. */
+interface NavLink {
+  path: string;
+  label: string;
+}
+
+/** Pages du menu (l'accueil est le titre « DJ Platform »). */
+export const NAV_LINKS: readonly NavLink[] = [
+  { path: '/catalog', label: 'Catalogue' },
+  { path: '/playlists', label: 'Playlists' },
+  { path: '/spotify', label: 'Spotify' },
+  { path: '/status', label: 'État' },
+];
+
+/** Composant racine : barre de menu, puis la page correspondant à l'URL. */
 @Component({
-  imports: [RouterOutlet],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive],
   selector: 'app-root',
-  template: '<router-outlet />',
+  templateUrl: './app.html',
+  styleUrl: './app.scss',
 })
-export class App {}
+export class App {
+  protected readonly links = NAV_LINKS;
+}

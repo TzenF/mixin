@@ -4,14 +4,6 @@
   @include m.filter-bar;
 }
 
-button {
-  @include m.button-primary;
-}
-
-button.secondary {
-  @include m.button-secondary;
-}
-
 .error {
   @include m.text-danger;
 }

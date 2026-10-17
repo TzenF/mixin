@@ -1,0 +1,22 @@
+<header class="topbar">
+  <nav class="nav" aria-label="Menu principal">
+    <a class="brand" routerLink="/" data-testid="nav-home"
+      ><span class="logo" aria-hidden="true">◉</span> DJ Platform</a
+    >
+    <ul class="links">
+      @for (link of links; track link.path) {
+        <li>
+          <a
+            [routerLink]="link.path"
+            routerLinkActive="active"
+            ariaCurrentWhenActive="page"
+            [attr.data-testid]="'nav-' + link.path.slice(1)"
+          >
+            {{ link.label }}
+          </a>
+        </li>
+      }
+    </ul>
+  </nav>
+</header>
+<router-outlet />

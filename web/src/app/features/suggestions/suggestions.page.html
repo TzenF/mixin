@@ -44,7 +44,7 @@
     }
     @case ('disconnected') {
       <p class="hint">Connecte-toi avec Spotify pour voir les suggestions.</p>
-      <a class="button" [href]="loginUrl" data-testid="connect-spotify">Connecter Spotify</a>
+      <a class="button accent" [href]="loginUrl" data-testid="connect-spotify">Connecter Spotify</a>
     }
     @case ('not_found') {
       <p class="error" data-testid="not-found">Ce morceau n'existe pas.</p>
@@ -64,7 +64,7 @@
         {{ seed.title }}
       </p>
       <p class="hint">{{ seed.artists.join(', ') }}</p>
-      <p>
+      <p class="toolbar">
         <span data-testid="seed-bpm">{{
           seed.bpm === null ? '—' : (seed.bpm | number: '1.1-1')
         }}</span>

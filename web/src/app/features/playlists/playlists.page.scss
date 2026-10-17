@@ -57,11 +57,6 @@ button.playlist {
   margin-left: t.$space-2;
 }
 
-button,
-.button {
-  @include m.button-primary;
-}
-
-button.secondary {
-  @include m.button-secondary;
+.badge.current {
+  @include m.status(accent);
 }

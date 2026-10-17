@@ -76,15 +76,10 @@ th {
   margin-left: t.$space-1;
 }
 
-button,
-.button {
-  @include m.button-primary;
-}
-
 button.flip {
   @include m.icon-button;
 }
 
-button.secondary {
-  @include m.button-secondary;
+.toolbar {
+  @include m.toolbar;
 }

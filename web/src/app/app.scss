@@ -1,0 +1,64 @@
+@use 'mixins' as m;
+@use 'tokens' as t;
+
+// Barre de menu marine, collée en haut ; la page active est soulignée en jaune.
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--color-nav-bg);
+  box-shadow: t.$shadow-card;
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: t.$space-2 t.$space-6;
+  max-width: t.$width-page;
+  margin: 0 auto;
+  padding: t.$space-2 t.$space-4;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: t.$space-2;
+  color: var(--color-nav-text);
+  font-weight: t.$font-weight-bold;
+  text-decoration: none;
+  @include m.focus-ring;
+}
+
+.logo {
+  color: var(--color-accent);
+}
+
+.links {
+  @include m.reset-list;
+  display: flex;
+  gap: t.$space-1;
+  // Sur téléphone : les liens passent sous le titre et défilent si besoin.
+  overflow-x: auto;
+
+  a {
+    display: inline-flex;
+    align-items: center;
+    height: t.$control-height;
+    padding: 0 t.$space-3;
+    border-bottom: t.$border-width * 3 solid transparent;
+    color: var(--color-nav-text);
+    text-decoration: none;
+    white-space: nowrap;
+    @include m.focus-ring;
+
+    &:hover {
+      border-bottom-color: var(--color-nav-text);
+    }
+
+    &.active {
+      border-bottom-color: var(--color-accent);
+      color: var(--color-accent);
+    }
+  }
+}

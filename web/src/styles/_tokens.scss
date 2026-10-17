@@ -34,23 +34,44 @@ $font-weight-bold: 600;
 // --- Animation et transparence ---
 $duration-fast: 200ms;
 $opacity-placeholder: 0.4; // place libérée pendant un glisser-déposer
+$opacity-disabled: 0.5; // bouton désactivé
 
 // --- Largeurs ---
 $width-field-sm: 5.5rem; // petit champ numérique (BPM)
+$width-card: 14rem; // largeur minimale d'une carte de l'accueil
 $width-narrow: 32rem;
 $width-page: 72rem;
 
-// --- Couleurs (thème clair) : appliquées sur :root dans styles.scss ---
+// --- Contrôles : boutons et champs ont la même hauteur, pour s'aligner sur une ligne ---
+$control-height: 2.25rem;
+$control-height-sm: 1.75rem; // petits boutons dans une ligne (▶, ★, ⇄, notes 1 à 5)
+
+// --- Ombre des cartes ---
+$shadow-card:
+  0 1px 2px rgb(13 35 72 / 8%),
+  0 1px 3px rgb(13 35 72 / 6%);
+
+// --- Couleurs (thème clair, TEMPORAIRE : bleu et jaune, en attendant la maquette Figma) ---
+// Contrastes vérifiés au niveau AA (≥ 4,5:1). Règle : jamais de texte jaune (accent) sur fond clair
+// (≈ 1,6:1, illisible) ; le jaune sert de fond, ou de texte sur le marine (nav-bg).
 @mixin theme-light {
-  --color-bg: #ffffff;
-  --color-text: #1d1d1f;
-  --color-text-muted: #666666;
-  --color-border: #d9d9de;
-  --color-primary: #5b3cc4;
+  --color-bg: #f3f7fc; // fond de page, bleu très pâle
+  --color-surface: #ffffff; // cartes, lignes, champs
+  --color-text: #14213d;
+  --color-text-muted: #4a5a75;
+  --color-border: #c9d8ec;
+  --color-primary: #1f5fbf;
+  --color-primary-hover: #174a96;
   --color-primary-contrast: #ffffff;
+  --color-nav-bg: #0d2348; // barre de menu, marine
+  --color-nav-text: #ffffff;
+  --color-accent: #f5c518; // jaune
+  --color-accent-contrast: #14213d; // texte sur le jaune
+  --color-accent-soft: #fff4c2; // fond de badge jaune pâle
+  --color-accent-text: #5c4300; // texte sur accent-soft
   --color-success-bg: #e7f6ec;
   --color-success-text: #11643a;
   --color-danger-bg: #fde8e8;
   --color-danger-text: #b42318;
-  --color-focus: #5b3cc4;
+  --color-focus: #1f5fbf;
 }

@@ -27,7 +27,7 @@
     }
     @case ('disconnected') {
       <p class="hint">Connecte-toi avec Spotify pour voir tes playlists.</p>
-      <a class="button" [href]="loginUrl" data-testid="connect-spotify">Connecter Spotify</a>
+      <a class="button accent" [href]="loginUrl" data-testid="connect-spotify">Connecter Spotify</a>
     }
     @case ('error') {
       <p class="error" data-testid="error">{{ errorMessage() }}</p>
@@ -53,7 +53,7 @@
                   <span class="badge" data-testid="imported">Spotify</span>
                 }
                 @if (currentPlaylist.current()?.id === playlist.id) {
-                  <span class="badge" data-testid="is-current">En cours</span>
+                  <span class="badge current" data-testid="is-current">En cours</span>
                 }
               </span>
             </button>

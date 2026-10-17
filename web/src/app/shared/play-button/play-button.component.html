@@ -4,6 +4,7 @@
   [title]="hint()"
   [attr.aria-label]="hint()"
   [attr.aria-pressed]="playing()"
+  [class.on]="playing()"
   [class.error]="error() !== null"
   (click)="toggle()"
   data-testid="play"

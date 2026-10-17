@@ -25,7 +25,3 @@ li {
 .error {
   @include m.text-danger;
 }
-
-button {
-  @include m.button-primary;
-}

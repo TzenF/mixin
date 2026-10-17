@@ -11,7 +11,7 @@
     }
     @case ('disconnected') {
       <p class="hint">Connecte-toi avec Spotify pour voir cette playlist.</p>
-      <a class="button" [href]="loginUrl" data-testid="connect-spotify">Connecter Spotify</a>
+      <a class="button accent" [href]="loginUrl" data-testid="connect-spotify">Connecter Spotify</a>
     }
     @case ('not_found') {
       <p class="error" data-testid="not-found">Cette playlist n'existe pas.</p>
@@ -48,7 +48,7 @@
           </button>
         }
         @if (currentPlaylist.current()?.id === playlist.id) {
-          <span class="badge" data-testid="is-current">Playlist en cours</span>
+          <span class="badge current" data-testid="is-current">Playlist en cours</span>
         } @else {
           <button
             type="button"
@@ -63,6 +63,7 @@
       @if (playlist.source_provider === null) {
         <button
           type="button"
+          class="accent"
           [disabled]="exporting() || playlist.items.length === 0"
           (click)="exportToSpotify()"
           data-testid="export-spotify"
@@ -196,7 +197,7 @@
               <app-track-correction [track]="row.item.track" (corrected)="onCorrected()" />
             </div>
             @if (row.transition; as t) {
-              <p [class]="'transition ' + t.kind" data-testid="transition">
+              <p [class]="'transition toolbar ' + t.kind" data-testid="transition">
                 <span data-testid="transition-text">{{ t.text }}</span>
                 @if (row.nextTrackId; as next) {
                   <app-play-transition-button [fromId]="row.item.track.id" [toId]="next" />

@@ -103,11 +103,10 @@ ol {
   @include m.status(success);
 }
 
-button,
-.button {
-  @include m.button-primary;
+.badge.current {
+  @include m.status(accent);
 }
 
-button.secondary {
-  @include m.button-secondary;
+.toolbar {
+  @include m.toolbar;
 }

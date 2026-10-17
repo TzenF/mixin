@@ -2,14 +2,17 @@
 // si un motif apparaît dans deux composants, il devient un mixin ici.
 //
 // Utilisation dans un composant :  @use 'mixins' as m;   puis   @include m.panel;
+//
+// Thème TEMPORAIRE (bleu et jaune) en attendant la maquette Figma : c'est ici et dans _tokens.scss qu'il se
+// remplacera, sans toucher aux pages.
 
 @use 'tokens' as t;
 
-/// Conteneur de page centré, avec marges latérales sur mobile.
+/// Conteneur de page centré, avec marges latérales sur mobile (la barre de menu occupe déjà le haut).
 /// @param $max-width largeur maximale du contenu
 @mixin page($max-width: t.$width-page) {
   max-width: $max-width;
-  margin: t.$space-16 auto;
+  margin: t.$space-8 auto t.$space-16;
   padding: 0 t.$space-4;
 }
 
@@ -17,10 +20,11 @@
 @mixin panel {
   padding: t.$space-2 t.$space-3;
   border-radius: t.$radius-md;
-  background: var(--color-bg);
+  background: var(--color-surface);
+  box-shadow: t.$shadow-card;
 }
 
-/// Couleurs d'état : success | danger.
+/// Couleurs d'état : success | danger | accent (jaune pâle, pour « en cours », « note cet enchaînement »).
 /// @param $kind type d'état
 @mixin status($kind) {
   @if $kind == success {
@@ -29,8 +33,11 @@
   } @else if $kind == danger {
     background: var(--color-danger-bg);
     color: var(--color-danger-text);
+  } @else if $kind == accent {
+    background: var(--color-accent-soft);
+    color: var(--color-accent-text);
   } @else {
-    @error "status(): état inconnu « #{$kind} » (attendu : success | danger)";
+    @error "status(): état inconnu « #{$kind} » (attendu : success | danger | accent)";
   }
 }
 
@@ -49,49 +56,129 @@
   }
 }
 
-/// Bouton principal (fonctionne aussi sur un lien <a>).
-@mixin button-primary {
-  display: inline-block;
-  padding: t.$space-2 t.$space-4;
-  border: none;
+/// Forme commune à tous les boutons et champs : même hauteur, contenu centré, pour s'aligner sur une ligne.
+/// @param $height hauteur du contrôle
+@mixin control($height: t.$control-height) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: t.$space-1;
+  box-sizing: border-box;
+  height: $height;
   border-radius: t.$radius-md;
-  background: var(--color-primary);
-  color: var(--color-primary-contrast);
   font: inherit;
+  line-height: 1;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/// Base commune des boutons (privée) : forme, curseur, focus, état désactivé. Les variantes n'ajoutent que leurs couleurs.
+/// @param $height hauteur du bouton
+@mixin _button($height: t.$control-height) {
+  @include control($height);
+  border: t.$border-width solid transparent;
   text-decoration: none;
   cursor: pointer;
   @include focus-ring;
 
   &:disabled {
-    opacity: 0.5;
+    opacity: t.$opacity-disabled;
     cursor: not-allowed;
   }
 }
 
-/// Bouton secondaire : même forme que le principal, encadré et sans fond.
+/// Bouton principal, bleu (fonctionne aussi sur un lien <a>).
+@mixin button-primary {
+  @include _button;
+  padding: 0 t.$space-4;
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-primary-contrast);
+
+  &:hover:not(:disabled) {
+    border-color: var(--color-primary-hover);
+    background: var(--color-primary-hover);
+  }
+}
+
+/// Couleurs d'un bouton secondaire (privé) : encadré, sur fond blanc, bleu au survol.
+@mixin _secondary-colors {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+
+  // Fond fixé aussi au survol : sinon le survol du bouton principal (global, fond bleu foncé) prendrait le dessus.
+  &:hover:not(:disabled) {
+    border-color: var(--color-primary);
+    background: var(--color-surface);
+    color: var(--color-primary);
+  }
+}
+
+/// Bouton secondaire : même forme que le principal, encadré, sur fond blanc.
 @mixin button-secondary {
-  @include button-primary;
-  border: t.$border-width solid var(--color-border);
-  background: transparent;
-  color: var(--color-text);
+  @include _button;
+  padding: 0 t.$space-4;
+  @include _secondary-colors;
 }
 
-/// Petit bouton d'action dans une ligne (ex. ⇄ inverser majeur/mineur).
+/// Bouton jaune : UNE seule action phare par page (« Exporter vers Spotify », « Connecter Spotify »).
+@mixin button-accent {
+  @include _button;
+  padding: 0 t.$space-4;
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-weight: t.$font-weight-bold;
+
+  &:hover:not(:disabled) {
+    background: var(--color-accent-soft);
+    color: var(--color-accent-text);
+  }
+}
+
+/// Petit bouton d'action dans une ligne (▶, ★, ⇄, notes 1 à 5…) : plus bas, carré au minimum.
 @mixin icon-button {
-  @include button-secondary;
-  margin-left: t.$space-2;
+  @include _button(t.$control-height-sm);
+  min-width: t.$control-height-sm;
   padding: 0 t.$space-2;
+  @include _secondary-colors;
 }
 
-/// Champ de formulaire (input, select).
+/// Groupe d'actions sur une ligne : tous centrés verticalement, espacés régulièrement, retour à la ligne si besoin.
+@mixin toolbar {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: t.$space-2;
+}
+
+/// Petit bouton allumé (★ favori, ▶ en cours) : pastille jaune, texte marine (jamais de texte jaune sur clair).
+@mixin icon-button-on {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+
+  &:hover:not(:disabled) {
+    border-color: var(--color-accent);
+    background: var(--color-accent-soft);
+    color: var(--color-accent-text);
+  }
+}
+
+/// Champ de formulaire (input, select), à la même hauteur que les boutons.
 @mixin field {
-  padding: t.$space-1 t.$space-2;
+  @include control;
+  justify-content: flex-start;
+  padding: 0 t.$space-2;
   border: t.$border-width solid var(--color-border);
-  border-radius: t.$radius-sm;
-  background: var(--color-bg);
+  background: var(--color-surface);
   color: var(--color-text);
-  font: inherit;
   @include focus-ring;
+
+  &:focus {
+    border-color: var(--color-primary);
+  }
 }
 
 /// Barre de filtres : libellés au-dessus de leur champ, `.toggle` pour une case à cocher sur une ligne.
@@ -113,6 +200,7 @@
     flex-direction: row;
     align-items: center;
     gap: t.$space-2;
+    height: t.$control-height;
   }
 
   input:not([type='checkbox']),
@@ -126,19 +214,30 @@
   @include panel;
   @include focus-ring;
   width: 100%;
+  // Une carte n'est pas un bouton ordinaire : pas de hauteur fixe, texte qui passe à la ligne, aligné à gauche.
+  display: block;
+  height: auto;
+  white-space: normal;
+  line-height: inherit;
+  align-items: stretch;
+  justify-content: flex-start;
   border: t.$border-width solid var(--color-border);
   color: var(--color-text);
   font: inherit;
   text-align: left;
   cursor: pointer;
 
-  &:hover {
+  &:hover:not(:disabled) {
     border-color: var(--color-primary);
+    background: var(--color-surface);
+    color: var(--color-text);
   }
 }
 
 /// Petite étiquette en ligne (statut, source…) ; la couleur vient de `status` ou `text-muted`.
 @mixin badge {
+  display: inline-flex;
+  align-items: center;
   padding: 0 t.$space-2;
   border-radius: t.$radius-sm;
   white-space: nowrap;
@@ -150,8 +249,9 @@
   position: absolute;
   bottom: 0;
   left: 0;
-  height: t.$border-width * 2;
-  background: var(--color-primary);
+  height: t.$border-width * 3;
+  border-radius: t.$radius-sm;
+  background: var(--color-accent);
 }
 
 /// Texte secondaire, moins contrasté.

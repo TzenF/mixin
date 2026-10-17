@@ -1,19 +1,20 @@
 <main>
   <h1>DJ Platform</h1>
-  <nav>
-    <ul data-testid="home-links">
-      @for (link of links; track link.path) {
-        <li>
-          <a
-            class="button"
-            [routerLink]="link.path"
-            [attr.data-testid]="'link-' + link.path.slice(1)"
-          >
-            {{ link.label }}
-          </a>
-          <span class="description">{{ link.description }}</span>
-        </li>
-      }
-    </ul>
-  </nav>
+  <p class="intro">Prépare tes sets : BPM, tonalités, enchaînements, puis export vers Spotify.</p>
+  <ul class="cards" data-testid="home-links">
+    @for (link of links; track link.path) {
+      <li class="card">
+        <h2>{{ link.label }}</h2>
+        <p class="description">{{ link.description }}</p>
+        <a
+          class="button"
+          [class.accent]="link.path === '/catalog'"
+          [routerLink]="link.path"
+          [attr.data-testid]="'link-' + link.path.slice(1)"
+        >
+          Ouvrir
+        </a>
+      </li>
+    }
+  </ul>
 </main>
