@@ -289,7 +289,10 @@ V2, dans l'ordre (une étape à la fois, plan validé avant de coder) :
    taux d'attaques, centroïde spectral, complexité dynamique, un composite, et le BPM seul comme référence ; extraits
    analysés puis supprimés. Ensuite seulement : colonne, `effective_features`, réanalyse, filtre, courbe d'énergie,
    sens monter / tenir / redescendre. Limite : l'énergie de 30 s d'extrait n'est pas celle du morceau entier.
-4. **Filtre « BPM suspects »** (demi ou double tempo probable), corrigeable avec ×2 / ÷2. Peut s'intercaler.
+4. **Filtre « BPM suspects » : mis de côté (17/10/2026)**, à reprendre plus tard. Mesuré sur la bibliothèque :
+   le BPM de Deezer ne sert pas de second avis (60 % absent, le reste d'accord avec Essentia) ; le critère « décalé
+   de ses voisins de playlist » n'ajoute rien. Plan prêt : suspect si BPM < 90 ou > 155 et pas encore vérifié
+   (environ 29 morceaux), badge « ½ ? » / « ×2 ? », bouton « Ce BPM est bon » (= correction à la même valeur).
 
 Prochaines idées (à décider) : corrections globales (admin).
 
