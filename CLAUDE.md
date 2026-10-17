@@ -162,7 +162,7 @@ Ne pas reproposer ces alternatives sans élément nouveau.
 | **Spotify** fournisseur principal | Usage réel de l'autrice ; ses playlists apparaissent dans rekordbox | Passer à Deezer (possible plus tard grâce à `MusicProvider` + ISRC) |
 | **Deezer** en coulisses | Extraits de 30 s et recherche par ISRC, sans compte utilisateur | — |
 | **Essentia** (profil `edma`) | Meilleur résultat mesuré, couverture 100 % via Deezer | ReccoBeats (59 % de couverture, tonalité 3/9) |
-| **LLM** (hors V1) | Uniquement pour **traduire une demande en filtres** ; le moteur choisit les morceaux | Laisser le LLM choisir les morceaux (enchaînements faux) |
+| **LLM** (hors V2) | Uniquement pour **traduire une demande en filtres** ; le moteur choisit les morceaux | Laisser le LLM choisir les morceaux (enchaînements faux) |
 | **Calcul des suggestions à la volée** en SQL | Suffisant à l'échelle actuelle | Pré-calculer toutes les paires |
 
 ## Modèle de données (décisions à respecter)
@@ -250,7 +250,7 @@ appel) et en-têtes de sécurité (CSP, HSTS), sauvegardes PostgreSQL, worker su
   « inverser majeur/mineur » dans l'interface.
 - Beatport/Mixgraph ne sont pas une vérité terrain ; Hooktheory (transcriptions humaines) est la meilleure référence.
 
-## Feuille de route V1
+## Feuille de route
 
 Fait : spikes, schéma, squelette (Compose, API, worker, front, CI), règles de code, OAuth Spotify + import des
 playlists, worker d'analyse (Deezer + Essentia), catalogue filtrable (page `/catalog`), bouton
@@ -258,15 +258,26 @@ playlists, worker d'analyse (Deezer + Essentia), catalogue filtrable (page `/cat
 la qualité des enchaînements, playlist en cours + « + Ajouter », glisser-déposer `@angular/cdk`), export vers
 Spotify (playlist privée, réexport = mise à jour), export TXT (détaillé ou tracklist),
 favoris (★, filtre, comptent dans « mes morceaux » ; pas d'import des titres likés Spotify).
-**Vérifié en réel le 17/10/2026** : export vers Spotify, mise à jour de la même playlist au réexport, et
-playlist (privée) visible dans rekordbox.
-**V1 terminée** avec les corrections manuelles (BPM avec ×2 / ÷2, tonalité, annuler ma correction).
-Prochaines idées (à décider) : filtre « BPM suspects » (demi/double tempo), corrections globales (admin).
+Corrections manuelles (BPM avec ×2 / ÷2, tonalité, annuler ma correction).
+
+**V1 terminée** (17/10/2026). Vérifié en réel : export Spotify, mise à jour au réexport, visible dans rekordbox.
+
+V2, dans l'ordre (une étape à la fois, plan validé avant de coder) :
+1. **Écouter les extraits** dans le navigateur : un morceau, et « l'enchaînement » (fin de A, fondu, début de B).
+   Le navigateur lit directement l'URL Deezer ; le serveur ne télécharge, ne stocke ni ne relaie l'audio.
+2. **Noter les transitions** (1 à 5, commentaire facultatif, sens A → B, table `transition_rating`) depuis une
+   playlist et les suggestions. Le score n'est pas modifié tant qu'il n'y a pas quelques dizaines de notes.
+3. **Énergie** : d'abord un spike (mesures Essentia comparées à mon classement de « vib »), puis colonne,
+   `effective_features`, réanalyse, filtre, courbe d'énergie, sens monter / tenir / redescendre.
+   Limite : l'énergie de 30 s d'extrait n'est pas celle du morceau entier.
+4. **Filtre « BPM suspects »** (demi ou double tempo probable), corrigeable avec ×2 / ÷2. Peut s'intercaler.
+
+Prochaines idées (à décider) : corrections globales (admin).
 
 Retirés (16/10/2026) : **import XML rekordbox** (l'autrice utilise rekordbox seulement comme destination, via
 Spotify) et donc **export M3U** (sans import rekordbox, aucun chemin de fichier audio : un M3U serait vide).
 La source `rekordbox` reste dans le schéma et dans la priorité de `effective_features`, inutilisée : ne pas la
 retirer (migration sans bénéfice).
 
-Hors V1 (ne pas anticiper) : extraits audio dans le navigateur, partage/commentaires, page Discover,
-embeddings (pgvector) et recherche par texte, génération de playlist par LLM.
+Hors V2 (ne pas anticiper) : partage/commentaires, page Discover, embeddings (pgvector) et recherche par texte,
+génération de playlist par LLM.
