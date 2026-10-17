@@ -21,6 +21,7 @@ const SEED: CatalogTrack = {
   key_confidence: 0.6,
   analysis_status: 'done',
   favorite: false,
+  mine: true,
 };
 const ROCK: Suggestion = {
   track_id: 'rock',

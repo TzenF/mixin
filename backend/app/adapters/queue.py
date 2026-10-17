@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 from arq import create_pool
 from arq.connections import ArqRedis, RedisSettings
+
+# Avance donnée aux tâches prioritaires (voir enqueue_explore_sync). arq calcule l'expiration de la tâche
+# depuis son heure prévue (un jour par défaut) : une avance d'un jour ou plus serait refusée par Redis.
+_PRIORITY_ADVANCE = timedelta(hours=6)
 
 
 class TaskQueue:
@@ -25,6 +31,18 @@ class TaskQueue:
         """Met l'analyse d'un morceau en file ; renvoie None si elle y est déjà."""
         # _job_id fixe : une analyse déjà en file pour ce morceau n'est pas dupliquée
         job = await self._redis.enqueue_job("analyze_track", track_id, _job_id=f"analyze:{track_id}")
+        return job.job_id if job else None
+
+    async def enqueue_explore_sync(self, source_id: str) -> str | None:
+        """Met la synchronisation d'une source de l'Explorer en file ; None si elle y est déjà."""
+        # arq trie la file par heure prévue : une heure passée fait passer la synchronisation (une requête
+        # Deezer) devant les centaines d'analyses mises en file depuis moins de 6 h.
+        job = await self._redis.enqueue_job(
+            "sync_explore_source",
+            source_id,
+            _job_id=f"explore:{source_id}",
+            _defer_until=datetime.now(UTC) - _PRIORITY_ADVANCE,
+        )
         return job.job_id if job else None
 
     async def ping(self) -> bool:

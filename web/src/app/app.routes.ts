@@ -29,6 +29,11 @@ export const routes: Routes = [
     title: 'Suggestions · DJ Platform',
   },
   {
+    path: 'explore',
+    loadComponent: () => import('./features/explore/explore.page').then((m) => m.ExplorePage),
+    title: 'Explorer · DJ Platform',
+  },
+  {
     path: 'playlists',
     loadComponent: () => import('./features/playlists/playlists.page').then((m) => m.PlaylistsPage),
     title: 'Playlists · DJ Platform',

@@ -16,6 +16,7 @@ from app.adapters.import_job_repository import ImportJobRepository
 from app.adapters.playlist_repository import PlaylistRepository
 from app.adapters.track_repository import TrackRepository
 from app.domain.music_provider import MusicProvider, ProviderTrack
+from app.services.track_import import save_provider_tracks
 
 log = logging.getLogger(__name__)
 
@@ -102,28 +103,7 @@ class PlaylistImporter:
 
     async def _save_tracks(self, tx: Queryable, tracks: list[ProviderTrack]) -> tuple[list[UUID], list[UUID]]:
         """Enregistre les morceaux lisibles ; renvoie leurs identifiants (en ordre), puis les nouveaux."""
-        repo = TrackRepository(tx)
-        ordered: list[UUID] = []
-        new: list[UUID] = []
-        for track in tracks:
-            if track.external_id is None:  # morceau local, épisode, morceau retiré
-                continue
-            track_id = await self._find(repo, track.isrc, track.external_id)
-            if track_id is None:
-                track_id = await repo.create(track.title, track.duration_ms, track.isrc)
-                await repo.set_artists(track_id, track.artists)
-                new.append(track_id)
-            await repo.add_external_id(track_id, self._provider.name, track.external_id)
-            ordered.append(track_id)
-        return ordered, new
-
-    async def _find(self, repo: TrackRepository, isrc: str | None, external_id: str) -> UUID | None:
-        """Cherche le morceau en base : d'abord par ISRC, puis par identifiant chez le service."""
-        if isrc:
-            found = await repo.find_by_isrc(isrc)
-            if found is not None:
-                return found
-        return await repo.find_by_external_id(self._provider.name, external_id)
+        return await save_provider_tracks(TrackRepository(tx), self._provider.name, tracks)
 
     async def _enqueue(self, track_ids: list[UUID]) -> int:
         """Met les nouveaux morceaux en file d'analyse ; renvoie combien l'ont été."""

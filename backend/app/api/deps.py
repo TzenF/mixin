@@ -8,6 +8,7 @@ from fastapi import Cookie, Depends, HTTPException, Request, status
 
 from app.adapters.db import Database
 from app.adapters.deezer_client import DeezerClient
+from app.adapters.explore_repository import ExploreRepository
 from app.adapters.oauth_state_store import OAuthStateStore
 from app.adapters.playlist_repository import PlaylistRepository
 from app.adapters.queue import TaskQueue
@@ -131,3 +132,8 @@ def get_preview_service(
 def get_rating_repository(db: Annotated[Database, Depends(get_db)]) -> RatingRepository:
     """Fournit le dépôt des notes de transitions."""
     return RatingRepository(db)
+
+
+def get_explore_repository(db: Annotated[Database, Depends(get_db)]) -> ExploreRepository:
+    """Fournit le dépôt des sources de l'Explorer."""
+    return ExploreRepository(db)

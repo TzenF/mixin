@@ -1,4 +1,4 @@
-"""Deezer, utilisé en coulisses : retrouve un morceau par ISRC et télécharge son extrait de 30 s.
+"""Deezer, en coulisses : morceau par ISRC, extrait de 30 s, et playlists publiques (tops, éditoriales).
 
 API publique, sans compte utilisateur. Vérifié en octobre 2026 : `GET /track/isrc:<ISRC>` renvoie `id` et
 `preview` (URL signée qui expire : on la télécharge aussitôt, on ne la stocke jamais). Les erreurs arrivent
@@ -11,16 +11,20 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 from urllib.parse import quote, urlsplit
 
 import httpx
 
 from app.adapters.http_retry import request_with_retry
+from app.domain.music_provider import ProviderTrack
 
 DEEZER_API = "https://api.deezer.com"
 _NO_DATA = 800
 # Un extrait de 30 s pèse environ 480 Ko (mesuré en octobre 2026) : au-delà de 5 Mo, ce n'en est pas un.
 MAX_PREVIEW_BYTES = 5_000_000
+# Garde-fou : on ne lit pas plus de morceaux que ça dans une playlist (les tops en ont 100).
+MAX_PLAYLIST_TRACKS = 2000
 
 
 class DeezerUnavailableError(Exception):
@@ -37,6 +41,16 @@ class DeezerTrack:
 
     deezer_id: str
     preview_url: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class DeezerPlaylist:
+    """Une playlist publique de Deezer (top, playlist éditoriale…)."""
+
+    deezer_id: str
+    title: str
+    curator: str | None
+    track_count: int
 
 
 class DeezerClient:
@@ -57,13 +71,46 @@ class DeezerClient:
     async def _track(self, url: str) -> DeezerTrack | None:
         """Appelle /track/… et lit la réponse ; None pour « no data » (code 800), sinon erreur à réessayer."""
         data = (await self._get(url)).json()
-        if error := data.get("error"):
-            if error.get("code") == _NO_DATA:
-                return None
-            raise DeezerUnavailableError(f"Deezer : {error.get('message', 'erreur inconnue')}")
-        if not data.get("id"):
+        if self._missing(data) or not data.get("id"):
             return None
         return DeezerTrack(str(data["id"]), data.get("preview") or None)
+
+    @staticmethod
+    def _missing(data: dict[str, object]) -> bool:
+        """Vrai si Deezer répond « no data » (code 800) ; DeezerUnavailableError pour une autre erreur."""
+        error = data.get("error")
+        if not isinstance(error, dict):
+            return False
+        if error.get("code") == _NO_DATA:
+            return True
+        raise DeezerUnavailableError(f"Deezer : {error.get('message', 'erreur inconnue')}")
+
+    async def playlist(self, playlist_id: str) -> DeezerPlaylist | None:
+        """Titre, créateur et taille d'une playlist publique ; None si Deezer ne la connaît pas."""
+        data = (await self._get(f"{DEEZER_API}/playlist/{quote(playlist_id, safe='')}")).json()
+        if self._missing(data) or not data.get("id"):
+            return None
+        return DeezerPlaylist(
+            deezer_id=str(data["id"]),
+            title=data.get("title") or "",
+            curator=(data.get("creator") or {}).get("name"),
+            track_count=int(data.get("nb_tracks") or 0),
+        )
+
+    async def playlist_tracks(self, playlist_id: str) -> list[ProviderTrack] | None:
+        """Morceaux d'une playlist publique, dans l'ordre (ISRC, artiste principal) ; None si inconnue."""
+        url: str | None = f"{DEEZER_API}/playlist/{quote(playlist_id, safe='')}/tracks?limit=100"
+        tracks: list[ProviderTrack] = []
+        while url and len(tracks) < MAX_PLAYLIST_TRACKS:
+            data = (await self._get(url)).json()
+            if self._missing(data):
+                return None
+            tracks.extend(_provider_track(item) for item in data.get("data") or [])
+            url = data.get("next")
+            # On ne suit la pagination que vers l'API de Deezer.
+            if url and not url.startswith(f"{DEEZER_API}/"):
+                raise DeezerUnavailableError("Deezer a renvoyé un lien de page inattendu")
+        return tracks
 
     async def download(self, url: str, dest: Path) -> None:
         """Télécharge l'extrait dans le fichier `dest` (HTTPS uniquement, taille plafonnée)."""
@@ -101,3 +148,17 @@ def preview_expiry(url: str) -> datetime | None:
     """Date d'expiration d'une URL d'extrait (jeton `hdnea=exp=…`, environ 15 min) ; None si illisible."""
     match = re.search(r"[?&]hdnea=exp=(\d+)", url)
     return datetime.fromtimestamp(int(match.group(1)), UTC) if match else None
+
+
+def _provider_track(item: dict[str, Any]) -> ProviderTrack:
+    """Convertit un morceau d'une playlist Deezer ; un morceau non lisible n'a pas d'external_id."""
+    readable = bool(item.get("readable", True)) and bool(item.get("id"))
+    artist = (item.get("artist") or {}).get("name")
+    isrc = (item.get("isrc") or "").upper() or None
+    return ProviderTrack(
+        external_id=str(item["id"]) if readable else None,
+        title=item.get("title") or "(morceau indisponible)",
+        artists=[artist] if artist else [],  # Deezer ne donne ici que l'artiste principal (pas les « feat. »)
+        duration_ms=int(item["duration"]) * 1000 if item.get("duration") else None,
+        isrc=isrc,
+    )

@@ -15,6 +15,7 @@ const BLADE: CatalogTrack = {
   key_confidence: 0.7,
   analysis_status: 'done',
   favorite: false,
+  mine: true,
 };
 
 describe('TrackCorrectionComponent', () => {

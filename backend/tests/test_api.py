@@ -1,7 +1,9 @@
 import uuid
 
+import psycopg
 from fastapi.testclient import TestClient
 
+from app.config import get_settings
 from tests.conftest import requires_services
 
 
@@ -22,18 +24,19 @@ def test_tracks_routes_require_a_session(client: TestClient, tracks: dict[str, u
 
 
 @requires_services
-def test_suggestions(logged_in_client: TestClient, tracks: dict[str, uuid.UUID]) -> None:
-    # scope=all : ces morceaux ne sont dans aucune playlist de l'utilisateur
+def test_suggestions(logged_in_client: TestClient, tracks: dict[str, uuid.UUID], user_id: uuid.UUID) -> None:
+    # Morceaux du test mis en favoris de l'utilisateur (neuf) : avec scope=mine, seuls eux sont candidats,
+    # quelle que soit la taille de la base de dev (l'Explorer y ajoute des centaines de morceaux).
+    with psycopg.connect(get_settings().database_url, autocommit=True) as conn:
+        for track_id in tracks.values():
+            conn.execute("INSERT INTO favorite (user_id, track_id) VALUES (%s, %s)", (user_id, track_id))
     resp = logged_in_client.get(
-        f"/tracks/{tracks['Where Have You Been']}/suggestions", params={"scope": "all"}
+        f"/tracks/{tracks['Where Have You Been']}/suggestions", params={"scope": "mine"}
     )
     assert resp.status_code == 200
-    # La base de dev contient d'autres morceaux analysés : on ne regarde que ceux du test.
-    mine = {str(t) for t in tracks.values()}
-    titles = [s["title"] for s in resp.json() if s["track_id"] in mine]
+    titles = [s["title"] for s in resp.json()]
     # 130.1 en 5A passe devant 129.7 en 4A ; 141.9 BPM (+10.5 %) est hors tolérance
-    assert titles[:2] == ["Don't Wake Me Up", "Von dutch"]
-    assert "Dernière danse" not in titles
+    assert titles == ["Don't Wake Me Up", "Von dutch"]
 
 
 @requires_services

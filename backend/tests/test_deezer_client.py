@@ -9,6 +9,7 @@ import pytest
 from app.adapters.deezer_client import (
     MAX_PREVIEW_BYTES,
     DeezerClient,
+    DeezerPlaylist,
     DeezerTrack,
     DeezerUnavailableError,
     InvalidPreviewError,
@@ -108,3 +109,54 @@ async def test_get_track_by_deezer_id() -> None:
 async def test_get_track_gone_from_deezer() -> None:
     body = {"error": {"type": "DataException", "message": "no data", "code": 800}}
     assert await _deezer(lambda _req: httpx.Response(200, json=body)).get_track("1") is None
+
+
+def _item(n: int, **extra: object) -> dict[str, object]:
+    """Morceau tel que le renvoie GET /playlist/{id}/tracks."""
+    return {
+        "id": n,
+        "title": f"Titre {n}",
+        "isrc": f"fr{n:010d}",
+        "duration": 180,
+        "readable": True,
+        "artist": {"name": f"Artiste {n}"},
+        **extra,
+    }
+
+
+async def test_playlist_tracks_follows_pages_and_maps_tracks() -> None:
+    def respond(request: httpx.Request) -> httpx.Response:
+        """Deux pages : la première pointe vers la seconde."""
+        if request.url.params.get("index") == "100":
+            return httpx.Response(200, json={"data": [_item(3)]})
+        nxt = "https://api.deezer.com/playlist/42/tracks?limit=100&index=100"
+        return httpx.Response(200, json={"data": [_item(1), _item(2, readable=False)], "next": nxt})
+
+    tracks = await _deezer(respond).playlist_tracks("42")
+
+    assert tracks is not None
+    assert [t.external_id for t in tracks] == ["1", None, "3"]  # non lisible : pas d'identifiant
+    assert (tracks[0].isrc, tracks[0].artists, tracks[0].duration_ms) == (
+        "FR0000000001",
+        ["Artiste 1"],
+        180_000,
+    )
+
+
+async def test_playlist_tracks_refuses_a_foreign_next_link() -> None:
+    body = {"data": [_item(1)], "next": "https://ailleurs.example/page2"}
+    with pytest.raises(DeezerUnavailableError, match="lien de page"):
+        await _deezer(lambda _req: httpx.Response(200, json=body)).playlist_tracks("42")
+
+
+async def test_unknown_playlist() -> None:
+    body = {"error": {"type": "DataException", "message": "no data", "code": 800}}
+    deezer = _deezer(lambda _req: httpx.Response(200, json=body))
+    assert await deezer.playlist_tracks("42") is None
+    assert await deezer.playlist("42") is None
+
+
+async def test_playlist_details() -> None:
+    body = {"id": 1109890291, "title": "Top France", "creator": {"name": "Deezer Charts"}, "nb_tracks": 100}
+    playlist = await _deezer(lambda _req: httpx.Response(200, json=body)).playlist("1109890291")
+    assert playlist == DeezerPlaylist("1109890291", "Top France", "Deezer Charts", 100)

@@ -13,6 +13,7 @@ const TRACK: CatalogTrack = {
   key_confidence: 0.6,
   analysis_status: 'done',
   favorite: false,
+  mine: true,
 };
 const GOOD: Transition = {
   key_move: 'adjacent',

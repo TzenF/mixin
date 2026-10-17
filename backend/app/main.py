@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.adapters.db import Database
 from app.adapters.oauth_state_store import OAuthStateStore
 from app.adapters.queue import TaskQueue
-from app.api import auth, health, playlists, spotify, tracks, transitions
+from app.api import auth, explore, health, playlists, spotify, tracks, transitions
 from app.api.errors import register_error_handlers
 from app.config import Settings, get_settings
 
@@ -51,6 +51,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(tracks.router)
     app.include_router(playlists.router)
     app.include_router(transitions.router)
+    app.include_router(explore.router)
     return app
 
 

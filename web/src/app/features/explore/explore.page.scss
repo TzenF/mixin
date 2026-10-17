@@ -1,0 +1,48 @@
+@use 'mixins' as m;
+@use 'tokens' as t;
+
+main {
+  @include m.page;
+}
+
+.hint {
+  @include m.text-muted;
+}
+
+.error {
+  @include m.text-danger;
+}
+
+// Pastilles des sources : la source affichée est en jaune.
+.sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: t.$space-2;
+  margin-bottom: t.$space-4;
+}
+
+button.source {
+  @include m.card-button;
+  display: inline-flex;
+  flex-direction: column;
+  width: auto;
+  padding: t.$space-2 t.$space-3;
+
+  &.active {
+    border-color: var(--color-accent);
+    background: var(--color-accent-soft);
+    color: var(--color-accent-text);
+  }
+}
+
+.name {
+  font-weight: t.$font-weight-bold;
+}
+
+.count {
+  font-size: t.$font-size-sm;
+}
+
+.toolbar {
+  @include m.toolbar;
+}

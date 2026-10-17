@@ -15,6 +15,11 @@ const LINKS: HomeLink[] = [
     description: 'Mes morceaux avec BPM et tonalité ; bouton « Suggestions » pour enchaîner',
   },
   {
+    path: '/explore',
+    label: 'Explorer',
+    description: 'Tops et playlists éditoriales Deezer : de nouveaux morceaux à découvrir',
+  },
+  {
     path: '/playlists',
     label: 'Playlists',
     description: 'Mes playlists et la qualité de chaque enchaînement',

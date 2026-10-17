@@ -111,6 +111,7 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Message d'erreur d'API (front) | `web/src/app/core/api/api-error.ts` → `apiErrorMessage` |
 | Session côté front | `web/src/app/core/api/auth.service.ts` → `AuthService`, `SPOTIFY_LOGIN_URL` |
 | Menu principal | `web/src/app/app.ts` → `NAV_LINKS` (ajouter une page ici et dans `app.routes.ts`) |
+| Sources de l'Explorer (front) | `web/src/app/core/api/explore.service.ts` → `ExploreService` |
 | Playlists côté front | `web/src/app/core/api/playlist.service.ts` → `PlaylistService` |
 | Playlist « en cours » (front) | `web/src/app/core/current-playlist.service.ts` → `CurrentPlaylistService` ; pour les tests des pages : `FakeCurrentPlaylistService` (`current-playlist.service.fake.ts`) |
 | Bouton ★ / ☆ (front) | `web/src/app/shared/favorite-button/` |
@@ -123,6 +124,10 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Bouton « + Ajouter », barre « Playlist en cours » | `web/src/app/shared/add-to-playlist/`, `web/src/app/shared/current-playlist-bar/` |
 | Libellés et texte d'un enchaînement, écart de BPM signé (front) | `web/src/app/shared/key-moves.ts` → `KEY_MOVE_LABELS`, `formatBpmChange`, `describeTransition` |
 | Playlist en texte (TXT détaillé ou tracklist) | `web/src/app/shared/playlist-text.ts` → `playlistText`, `playlistFileName` (généré côté front : pas de route API) |
+| Explorer : sources (tops, éditoriales Deezer) | `app/adapters/explore_repository.py` → `ExploreRepository` ; `services/explore.py` → `ExploreSync` (tâche worker `sync_explore_source`, cron quotidien 5 h UTC) ; routes `GET /explore/sources`, `POST /explore/sources/{id}/refresh` ; morceaux d'une source = `GET /tracks?source=…&scope=all&sort=rank` |
+| Enregistrer des morceaux venus d'un service (ISRC, puis identifiant) | `services/track_import.py` → `save_provider_tracks` (import Spotify et Explorer) |
+| Lire une playlist publique Deezer | `DeezerClient.playlist`, `.playlist_tracks` (ISRC, extrait, artiste principal) |
+| Liste de morceaux filtrable (front) | `web/src/app/shared/track-browser/` (`mode="catalog"` ou `"explore"`, `[source]`) : utilisée par le Catalogue et l'Explorer |
 | Faire télécharger un fichier par le navigateur | `web/src/app/core/file-download.service.ts` → `FileDownloadService.saveText` |
 | Catalogue côté front | `web/src/app/core/api/catalog.service.ts` → `CatalogService` (`tracks`, `track`, `suggestions`, `flipMode`) |
 
@@ -243,6 +248,13 @@ réécrite se vérifie avant/après dans une transaction `REPEATABLE READ` (rés
   requête (non testé).
 - **Dans un test, `expect((a, b))` ne vérifie que `b`** (opérateur virgule) : comparer un tableau,
   `expect([a, b]).toEqual([…])`.
+- **Spotify refuse les playlists des autres** (vérifié le 17/10/2026) : ses playlists éditoriales (Top 50…)
+  répondent 404, une playlist publique d'un autre utilisateur 403. Découverte = **Deezer**
+  (`GET /playlist/{id}/tracks` : ISRC, extrait, mais **artiste principal seulement**, sans les « feat. »).
+- **Synchronisations de l'Explorer en série** (`ExploreRepository.lock_sync`) : deux tops qui partagent des morceaux,
+  recopiés en parallèle, donnaient un `DeadlockDetected`. Elles passent **devant** les analyses dans la file
+  (`TaskQueue.enqueue_explore_sync` : heure prévue 6 h dans le passé ; jamais un jour ou plus, Redis refuse).
+- **Progression d'analyse = morceaux `pending`**, pas « non `done` » : un morceau sans extrait ne sera jamais analysé.
 - **Formulaire avec nos propres messages d'erreur** : ajouter `novalidate`, sinon un `<input type="number" max>`
   bloque l'envoi (validation native du navigateur) avant notre contrôle.
 - **Fixtures `client` et `logged_in_client` = le même objet** (la seconde ajoute le cookie à la première) : pour
@@ -303,6 +315,11 @@ V2, dans l'ordre (une étape à la fois, plan validé avant de coder) :
    de ses voisins de playlist » n'ajoute rien. Plan prêt : suspect si BPM < 90 ou > 155 et pas encore vérifié
    (environ 29 morceaux), badge « ½ ? » / « ×2 ? », bouton « Ce BPM est bon » (= correction à la même valeur).
 
+5. **Explorer** (`/explore`, demandé le 17/10/2026) : tops et playlists éditoriales **Deezer** (Spotify les refuse),
+   recopiés chaque jour dans le catalogue et analysés ; badge « Nouveau » et « Nouveaux pour moi seulement ».
+   Livraison 1 (lire) : faite. À faire : 2. ajouter / retirer une source par lien ; 3. export Spotify des morceaux
+   venus de Deezer (identifiant Spotify retrouvé par ISRC).
+
 Prochaines idées (à décider) : corrections globales (admin).
 
 Retirés (16/10/2026) : **import XML rekordbox** (l'autrice utilise rekordbox seulement comme destination, via
@@ -310,5 +327,5 @@ Spotify) et donc **export M3U** (sans import rekordbox, aucun chemin de fichier 
 La source `rekordbox` reste dans le schéma et dans la priorité de `effective_features`, inutilisée : ne pas la
 retirer (migration sans bénéfice).
 
-Hors V2 (ne pas anticiper) : partage/commentaires, page Discover, embeddings (pgvector) et recherche par texte,
+Hors V2 (ne pas anticiper) : partage/commentaires, embeddings (pgvector) et recherche par texte,
 génération de playlist par LLM.

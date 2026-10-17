@@ -6,7 +6,7 @@ import { Observable } from 'rxjs';
 export type AnalysisStatus = 'pending' | 'done' | 'no_preview' | 'failed';
 
 /** Ordre du catalogue. */
-export type CatalogSort = 'title' | 'bpm' | 'key';
+export type CatalogSort = 'title' | 'bpm' | 'key' | 'rank';
 
 /** Un morceau du catalogue (voir backend/app/api/tracks.py) ; bpm et camelot à null sans analyse. */
 export interface CatalogTrack {
@@ -20,6 +20,10 @@ export interface CatalogTrack {
   key_confidence: number | null;
   analysis_status: AnalysisStatus;
   favorite: boolean;
+  /** Dans une de mes playlists ou en favori. */
+  mine: boolean;
+  /** Place dans la source de l'Explorer (1 = premier), null hors source. */
+  rank?: number | null;
 }
 
 /** Une page du catalogue ; total = nombre de morceaux qui passent les filtres. */
@@ -83,7 +87,8 @@ export interface KeyCorrected {
 
 /** Filtres, tri et page demandés ; une chaîne vide ou null = pas de filtre. */
 export interface CatalogQuery {
-  scope: 'mine' | 'all';
+  /** mine : mes morceaux ; all : tous ; new : ceux qui ne sont pas à moi. */
+  scope: 'mine' | 'all' | 'new';
   q: string;
   bpmMin: number | null;
   bpmMax: number | null;
@@ -94,6 +99,8 @@ export interface CatalogQuery {
   offset: number;
   /** Seulement mes favoris. */
   favoritesOnly: boolean;
+  /** Seulement les morceaux de cette source de l'Explorer, ou null. */
+  source: string | null;
 }
 
 /** Catalogue des morceaux : les miens (playlists importées) ou tous. */
@@ -122,6 +129,9 @@ export class CatalogService {
     }
     if (query.favoritesOnly) {
       params = params.set('favorites', true);
+    }
+    if (query.source !== null) {
+      params = params.set('source', query.source);
     }
     return this.http.get<CatalogPage>('/api/tracks', { params });
   }

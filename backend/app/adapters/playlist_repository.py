@@ -264,7 +264,7 @@ class PlaylistRepository:
             PlaylistItemRow(
                 item_id=r["item_id"],
                 position=r["position"],
-                track=CatalogRow(**{k: r[k] for k in _TRACK_FIELDS}),
+                track=CatalogRow(**{k: r[k] for k in _TRACK_FIELDS if k in r}),
                 transition_to_next=(
                     TransitionRow(**{k: r[k] for k in _TRANSITION_FIELDS})
                     if r["key_distance"] is not None

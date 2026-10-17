@@ -1,6 +1,7 @@
 """Worker d'analyse (arq) : lancé avec `arq app.worker.main.WorkerSettings`.
 
 Pour chaque morceau : extrait Deezer retrouvé par ISRC -> Essentia -> ligne `essentia` dans track_analysis.
+Explorer : chaque jour (et à la demande), les sources Deezer sont recopiées dans le catalogue.
 """
 
 from __future__ import annotations
@@ -10,13 +11,16 @@ from typing import Any
 from uuid import UUID
 
 import httpx
-from arq import Retry
+from arq import Retry, cron
 from arq.connections import RedisSettings
 
 from app.adapters.db import Database
 from app.adapters.deezer_client import DeezerClient, DeezerUnavailableError
 from app.adapters.essentia_analyzer import EssentiaAnalyzer
+from app.adapters.explore_repository import ExploreRepository
+from app.adapters.queue import TaskQueue
 from app.config import get_settings
+from app.services.explore import ExploreSourceMissingError, ExploreSync
 from app.services.track_analysis import TrackAnalyzer
 
 log = logging.getLogger("worker")
@@ -31,6 +35,11 @@ async def startup(ctx: dict[str, Any]) -> None:
     ctx["db"] = await Database.connect(settings.database_url)
     ctx["http"] = httpx.AsyncClient(timeout=30, follow_redirects=True)
     ctx["analyzer"] = TrackAnalyzer(ctx["db"], DeezerClient(ctx["http"]), EssentiaAnalyzer())
+    ctx["queue"] = TaskQueue(ctx["redis"])
+    ctx["explore"] = ExploreSync(ctx["db"], DeezerClient(ctx["http"]), ctx["queue"])
+    # Sources ajoutées (migration ou utilisateur) mais jamais recopiées : on s'en occupe tout de suite.
+    for source_id in await ExploreRepository(ctx["db"]).ids(never_synced_only=True):
+        await ctx["queue"].enqueue_explore_sync(str(source_id))
 
 
 async def shutdown(ctx: dict[str, Any]) -> None:
@@ -53,10 +62,34 @@ async def analyze_track(ctx: dict[str, Any], track_id: str) -> str:
         raise Retry(defer=RETRY_DELAY_SECONDS * ctx["job_try"]) from e
 
 
+async def sync_explore_source(ctx: dict[str, Any], source_id: str) -> str:
+    """Recopie une source de l'Explorer depuis Deezer ; un échec est noté sur la source (réessai demain)."""
+    explore: ExploreSync = ctx["explore"]
+    try:
+        result = await explore.sync(UUID(source_id))
+    except ExploreSourceMissingError:
+        return "not_found"
+    except DeezerUnavailableError as e:
+        log.warning("Synchronisation de la source %s impossible : %s", source_id, e)
+        return "failed"
+    log.info("Source %s : %s morceaux, %s nouveaux", source_id, result.total, result.new)
+    return "done"
+
+
+async def sync_all_explore_sources(ctx: dict[str, Any]) -> int:
+    """Tâche quotidienne : met en file la synchronisation de toutes les sources ; renvoie leur nombre."""
+    ids = await ExploreRepository(ctx["db"]).ids()
+    for source_id in ids:
+        await ctx["queue"].enqueue_explore_sync(str(source_id))
+    return len(ids)
+
+
 class WorkerSettings:
     """Configuration lue par arq : tâches disponibles, connexion Redis, parallélisme."""
 
-    functions = [analyze_track]
+    functions = [analyze_track, sync_explore_source]
+    # Les tops changent chaque semaine : une mise à jour par jour suffit (une requête Deezer par source).
+    cron_jobs = [cron(sync_all_explore_sources, hour={5}, minute={0})]
     on_startup = startup
     on_shutdown = shutdown
     redis_settings = RedisSettings.from_dsn(settings.redis_url)

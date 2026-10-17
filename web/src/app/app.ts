@@ -10,6 +10,7 @@ interface NavLink {
 /** Pages du menu (l'accueil est le titre « DJ Platform »). */
 export const NAV_LINKS: readonly NavLink[] = [
   { path: '/catalog', label: 'Catalogue' },
+  { path: '/explore', label: 'Explorer' },
   { path: '/playlists', label: 'Playlists' },
   { path: '/spotify', label: 'Spotify' },
   { path: '/status', label: 'État' },

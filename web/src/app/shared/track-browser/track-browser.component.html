@@ -1,0 +1,239 @@
+<form class="filters" (submit)="$event.preventDefault()" data-testid="filters">
+  @if (mode() === 'catalog') {
+    <label class="toggle">
+      <input
+        type="checkbox"
+        [checked]="query().scope === 'all'"
+        (change)="setShowAll(checkedOf($event))"
+        data-testid="show-all"
+      />
+      Tous les morceaux
+    </label>
+  } @else {
+    <label class="toggle">
+      <input
+        type="checkbox"
+        [checked]="query().scope === 'new'"
+        (change)="setNewOnly(checkedOf($event))"
+        data-testid="new-only"
+      />
+      Nouveaux pour moi seulement
+    </label>
+  }
+
+  <label class="toggle">
+    <input
+      type="checkbox"
+      [checked]="query().favoritesOnly"
+      (change)="setFavoritesOnly(checkedOf($event))"
+      data-testid="favorites-only"
+    />
+    Favoris seulement
+  </label>
+
+  <label>
+    Recherche
+    <input
+      type="search"
+      placeholder="Titre ou artiste"
+      [value]="query().q"
+      (input)="search(valueOf($event))"
+      data-testid="search"
+    />
+  </label>
+
+  <label>
+    BPM min
+    <input
+      type="number"
+      min="0"
+      max="300"
+      [value]="query().bpmMin ?? ''"
+      (change)="setBpmMin(valueOf($event))"
+      data-testid="bpm-min"
+    />
+  </label>
+
+  <label>
+    BPM max
+    <input
+      type="number"
+      min="0"
+      max="300"
+      [value]="query().bpmMax ?? ''"
+      (change)="setBpmMax(valueOf($event))"
+      data-testid="bpm-max"
+    />
+  </label>
+
+  <label>
+    Tonalité
+    <input
+      type="text"
+      placeholder="8A, Am…"
+      size="5"
+      [value]="query().key"
+      (change)="setKey(valueOf($event))"
+      data-testid="key"
+    />
+  </label>
+
+  <label>
+    Statut
+    <select (change)="setStatus(valueOf($event))" data-testid="status">
+      <option value="" [selected]="query().status === ''">Tous</option>
+      @for (status of statuses; track status) {
+        <option [value]="status" [selected]="query().status === status">
+          {{ statusLabels[status] }}
+        </option>
+      }
+    </select>
+  </label>
+
+  <label>
+    Trier par
+    <select (change)="setSort(valueOf($event))" data-testid="sort">
+      @if (mode() === 'explore') {
+        <option value="rank" [selected]="query().sort === 'rank'">Rang</option>
+      }
+      <option value="title" [selected]="query().sort === 'title'">Titre</option>
+      <option value="bpm" [selected]="query().sort === 'bpm'">BPM</option>
+      <option value="key" [selected]="query().sort === 'key'">Tonalité</option>
+    </select>
+  </label>
+</form>
+
+@switch (state().kind) {
+  @case ('loading') {
+    <p class="hint" data-testid="loading">Chargement…</p>
+  }
+  @case ('disconnected') {
+    <p class="hint">Connecte-toi avec Spotify pour voir ton catalogue.</p>
+    <a class="button accent" [href]="loginUrl" data-testid="connect-spotify">Connecter Spotify</a>
+  }
+  @case ('error') {
+    <p class="error" data-testid="error">{{ errorMessage() }}</p>
+    <button type="button" (click)="load()">Réessayer</button>
+  }
+}
+
+@if (page(); as page) {
+  @if (correctionError(); as message) {
+    <p class="error" data-testid="correction-error">{{ message }}</p>
+  }
+  @if (range(); as r) {
+    <p class="hint" data-testid="range">{{ r.from }}–{{ r.to }} sur {{ r.total }}</p>
+    <table data-testid="tracks">
+      <thead>
+        <tr>
+          @if (mode() === 'explore') {
+            <th scope="col" class="number">#</th>
+          }
+          <th scope="col" aria-label="Écouter et favori"></th>
+          <th scope="col">Titre</th>
+          <th scope="col">Artistes</th>
+          <th scope="col" class="number">BPM</th>
+          <th scope="col">Tonalité</th>
+          <th scope="col">Analyse</th>
+          <th scope="col" aria-label="Actions"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (track of page.items; track track.id) {
+          <tr data-testid="track-row">
+            @if (mode() === 'explore') {
+              <td class="number" data-testid="rank">{{ track.rank ?? '' }}</td>
+            }
+            <td>
+              <span class="toolbar">
+                <app-play-button
+                  [trackId]="track.id"
+                  [noPreview]="track.analysis_status === 'no_preview'"
+                />
+                <app-favorite-button [trackId]="track.id" [favorite]="track.favorite" />
+              </span>
+            </td>
+            <td>
+              {{ track.title }}
+              @if (mode() === 'explore' && !track.mine) {
+                <span class="badge new" data-testid="new-badge">Nouveau</span>
+              }
+            </td>
+            <td class="muted">{{ track.artists.join(', ') }}</td>
+            <td class="number" data-testid="bpm">
+              {{ track.bpm === null ? '—' : (track.bpm | number: '1.1-1') }}
+              @if (track.bpm_source === 'manual') {
+                <span class="corrected" data-testid="bpm-corrected" title="Corrigé par toi"
+                  >corrigé</span
+                >
+              }
+            </td>
+            <td class="key">
+              <span class="toolbar">
+                <span data-testid="camelot">{{ track.camelot ?? '—' }}</span>
+                @if (track.key_source === 'manual') {
+                  <span class="corrected" data-testid="corrected" title="Corrigée par toi"
+                    >corrigée</span
+                  >
+                }
+                <button
+                  type="button"
+                  class="flip"
+                  title="Inverser majeur/mineur (même tonique)"
+                  aria-label="Inverser majeur/mineur"
+                  [disabled]="track.camelot === null || flipping() === track.id"
+                  (click)="flipMode(track)"
+                  data-testid="flip-mode"
+                >
+                  ⇄
+                </button>
+              </span>
+            </td>
+            <td>
+              <span [class]="'badge ' + track.analysis_status" data-testid="status-badge">
+                {{ statusLabels[track.analysis_status] }}
+              </span>
+            </td>
+            <td>
+              <span class="toolbar">
+                <button
+                  type="button"
+                  class="secondary"
+                  (click)="openSuggestions(track)"
+                  data-testid="open-suggestions"
+                >
+                  Suggestions
+                </button>
+                <app-add-to-playlist [trackId]="track.id" />
+                <app-track-correction [track]="track" (corrected)="onCorrected($event)" />
+              </span>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  } @else {
+    <p class="hint" data-testid="empty">Aucun morceau ne correspond à ces filtres.</p>
+  }
+
+  <nav class="pager">
+    <button
+      type="button"
+      class="secondary"
+      [disabled]="!hasPrevious()"
+      (click)="previous()"
+      data-testid="previous"
+    >
+      Précédent
+    </button>
+    <button
+      type="button"
+      class="secondary"
+      [disabled]="!hasNext()"
+      (click)="next()"
+      data-testid="next"
+    >
+      Suivant
+    </button>
+  </nav>
+}

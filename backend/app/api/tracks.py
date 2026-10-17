@@ -46,6 +46,8 @@ class CatalogTrack(BaseModel):
     key_confidence: float | None
     analysis_status: AnalysisStatus
     favorite: bool
+    mine: bool
+    rank: int | None = None
 
 
 class Catalog(BaseModel):
@@ -59,7 +61,7 @@ class Catalog(BaseModel):
 async def catalog(
     tracks: Tracks,
     user_id: CurrentUser,
-    scope: Literal["mine", "all"] = "mine",
+    scope: Literal["mine", "all", "new"] = "mine",
     q: Annotated[str | None, Query(max_length=100)] = None,
     bpm_min: Annotated[float | None, Query(ge=0, le=300)] = None,
     bpm_max: Annotated[float | None, Query(ge=0, le=300)] = None,
@@ -69,8 +71,9 @@ async def catalog(
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
     favorites: bool = False,
+    source: Annotated[UUID | None, Query(description="Source de l'Explorer")] = None,
 ) -> Catalog:
-    """Liste les morceaux (les miens, ou tous avec scope=all), filtrés et triés, page par page."""
+    """Liste les morceaux (les miens, tous, ou les nouveaux pour moi), filtrés et triés, page par page."""
     try:
         camelot = CamelotKey.parse(key) if key else None
     except ValueError as e:
@@ -79,6 +82,8 @@ async def catalog(
         user_id,
         CatalogFilters(
             only_mine=scope == "mine",
+            only_new=scope == "new",
+            source_id=source,
             text=(q or "").strip() or None,
             bpm_min=bpm_min,
             bpm_max=bpm_max,

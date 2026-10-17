@@ -24,6 +24,7 @@ const ALPHA: CatalogTrack = {
   key_confidence: 0.6,
   analysis_status: 'done',
   favorite: false,
+  mine: true,
 };
 const PENDING: CatalogTrack = {
   ...ALPHA,

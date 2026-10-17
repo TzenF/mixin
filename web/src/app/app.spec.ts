@@ -14,7 +14,7 @@ describe('App (menu)', () => {
       imports: [App],
       providers: [
         provideRouter(
-          ['', 'catalog', 'playlists', 'spotify', 'status'].map((path) => ({
+          ['', 'catalog', 'explore', 'playlists', 'spotify', 'status'].map((path) => ({
             path,
             component: EmptyPage,
           })),
@@ -31,7 +31,7 @@ describe('App (menu)', () => {
   it('propose un lien vers chaque page et vers l’accueil', async () => {
     const root = await render('/');
     const hrefs = Array.from(root.querySelectorAll('nav a')).map((a) => a.getAttribute('href'));
-    expect(hrefs).toEqual(['/', '/catalog', '/playlists', '/spotify', '/status']);
+    expect(hrefs).toEqual(['/', '/catalog', '/explore', '/playlists', '/spotify', '/status']);
   });
 
   it('signale la page active', async () => {

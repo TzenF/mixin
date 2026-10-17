@@ -10,7 +10,7 @@ from app.adapters.db import Queryable
 from app.adapters.rating_repository import RATING_JOIN_SQL
 from app.domain.camelot import CamelotKey
 
-CatalogSort = Literal["title", "bpm", "key"]
+CatalogSort = Literal["title", "bpm", "key", "rank"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,6 +28,8 @@ class CatalogFilters:
     offset: int = 0
     track_id: UUID | None = None  # un seul morceau (fiche d'un morceau)
     favorites_only: bool = False
+    only_new: bool = False  # seulement ce qui n'est pas à moi (ni dans mes playlists, ni en favori)
+    source_id: UUID | None = None  # seulement les morceaux de cette source de l'Explorer
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +46,8 @@ class CatalogRow:
     key_confidence: float | None
     analysis_status: str
     favorite: bool
+    mine: bool  # dans une de mes playlists ou en favori
+    rank: int | None = None  # place dans la source de l'Explorer (1 = premier), None hors source
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,10 +86,13 @@ _FAVORITE_SQL = (
     """EXISTS (SELECT 1 FROM favorite fav WHERE fav.track_id = t.id AND fav.user_id = %(user_id)s::uuid)"""
 )
 
-# « Mes morceaux » = ceux de mes playlists et mes favoris ; sans effet si only_mine est faux.
-_MINE_SQL = f"""(NOT %(only_mine)s OR {_FAVORITE_SQL} OR EXISTS (
+# Le morceau `t` est à moi : dans une de mes playlists, ou en favori.
+_IS_MINE_SQL = f"""({_FAVORITE_SQL} OR EXISTS (
           SELECT 1 FROM playlist_item pi JOIN playlist p ON p.id = pi.playlist_id
           WHERE pi.track_id = t.id AND p.owner_id = %(user_id)s::uuid))"""
+
+# « Mes morceaux » = ceux de mes playlists et mes favoris ; sans effet si only_mine est faux.
+_MINE_SQL = f"(NOT %(only_mine)s OR {_IS_MINE_SQL})"
 
 # Seulement mes favoris ; sans effet si favorites_only est faux.
 _FAVORITES_ONLY_SQL = f"(NOT %(favorites_only)s OR {_FAVORITE_SQL})"
@@ -108,8 +115,11 @@ LIMIT %(limit)s
 _CATALOG_FROM = f"""
 FROM track t
 LEFT JOIN effective_features(%(user_id)s::uuid) f ON f.track_id = t.id
+LEFT JOIN explore_item ei ON ei.track_id = t.id AND ei.source_id = %(source_id)s::uuid
 WHERE {_MINE_SQL}
   AND {_FAVORITES_ONLY_SQL}
+  AND (NOT %(only_new)s OR NOT {_IS_MINE_SQL})
+  AND (%(source_id)s::uuid IS NULL OR ei.source_id IS NOT NULL)
   AND (%(track_id)s::uuid IS NULL OR t.id = %(track_id)s::uuid)
   AND (%(text)s::text IS NULL OR t.title ILIKE %(text)s OR EXISTS (
           SELECT 1 FROM track_artist ta JOIN artist a ON a.id = ta.artist_id
@@ -129,16 +139,18 @@ TRACK_COLUMNS_SQL = f"""
        f.bpm_source::text AS bpm_source, f.key_source::text AS key_source,
        f.key_confidence::float AS key_confidence,
        t.analysis_status::text AS analysis_status,
-       {_FAVORITE_SQL} AS favorite
+       {_FAVORITE_SQL} AS favorite,
+       {_IS_MINE_SQL} AS mine
 """
 
-_CATALOG_SELECT = f"SELECT {TRACK_COLUMNS_SQL}"
+_CATALOG_SELECT = f"SELECT {TRACK_COLUMNS_SQL}, ei.position + 1 AS rank"
 
 # Liste fermée : le tri est inséré tel quel dans le SQL, jamais une valeur venue de la requête HTTP.
 _CATALOG_ORDER: dict[CatalogSort, str] = {
     "title": "lower(t.title), t.id",
     "bpm": "f.bpm NULLS LAST, lower(t.title), t.id",
     "key": "f.camelot_num NULLS LAST, f.camelot_letter, f.bpm, lower(t.title), t.id",
+    "rank": "ei.position NULLS LAST, lower(t.title), t.id",
 }
 
 
@@ -192,6 +204,8 @@ class TrackRepository:
             "offset": filters.offset,
             "track_id": filters.track_id,
             "favorites_only": filters.favorites_only,
+            "only_new": filters.only_new,
+            "source_id": filters.source_id,
         }
         # Deux requêtes : le total reste juste même quand la page demandée est vide.
         total = await self._db.fetch_one(f"SELECT count(*) AS n {_CATALOG_FROM}", params)

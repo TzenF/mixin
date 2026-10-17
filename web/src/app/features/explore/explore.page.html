@@ -1,0 +1,73 @@
+<main>
+  <h1>Explorer</h1>
+  <p class="hint">
+    Des morceaux à découvrir dans les tops et les playlists éditoriales de Deezer, mis à jour chaque
+    jour. Un morceau « Nouveau » n'est encore ni dans tes playlists ni dans tes favoris.
+  </p>
+
+  @switch (state().kind) {
+    @case ('loading') {
+      <p class="hint" data-testid="loading">Chargement…</p>
+    }
+    @case ('disconnected') {
+      <p class="hint">Connecte-toi avec Spotify pour explorer.</p>
+      <a class="button accent" [href]="loginUrl" data-testid="connect-spotify">Connecter Spotify</a>
+    }
+    @case ('error') {
+      <p class="error" data-testid="error">{{ errorMessage() }}</p>
+      <button type="button" (click)="load()">Réessayer</button>
+    }
+  }
+
+  @if (sources(); as sources) {
+    <nav class="sources" aria-label="Sources" data-testid="sources">
+      @for (source of sources; track source.id) {
+        <button
+          type="button"
+          class="source"
+          [class.active]="selected()?.id === source.id"
+          [attr.aria-pressed]="selected()?.id === source.id"
+          (click)="choose(source)"
+          data-testid="source"
+        >
+          <span class="name">{{ source.title }}</span>
+          <span class="count">
+            @if (source.last_synced_at === null) {
+              en préparation…
+            } @else {
+              {{ source.track_count }} titres
+              @if (source.pending_count > 0) {
+                · {{ source.pending_count }} en cours d'analyse
+              }
+            }
+          </span>
+        </button>
+      }
+    </nav>
+
+    @if (selected(); as source) {
+      <p class="status toolbar" data-testid="source-status">
+        <span class="hint">
+          {{ source.curator ?? 'Deezer' }}
+          @if (source.last_synced_at) {
+            · mis à jour le {{ source.last_synced_at | date: "dd/MM 'à' HH:mm" }}
+          }
+        </span>
+        <button type="button" class="secondary" (click)="refresh(source)" data-testid="refresh">
+          Actualiser
+        </button>
+        @if (notice(); as message) {
+          <span class="hint" data-testid="notice">{{ message }}</span>
+        }
+      </p>
+      @if (source.last_error; as error) {
+        <p class="error" data-testid="source-error">Dernière mise à jour en échec : {{ error }}</p>
+      }
+
+      <app-current-playlist-bar />
+      @for (id of browserKeys(); track id) {
+        <app-track-browser mode="explore" [source]="id" />
+      }
+    }
+  }
+</main>
