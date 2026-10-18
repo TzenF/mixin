@@ -3,7 +3,6 @@
 
 :host {
   display: block;
-  margin-bottom: t.$space-4;
 }
 
 figure {
@@ -50,18 +49,7 @@ svg {
 .segment {
   stroke-width: t.$chart-stroke-width;
   stroke-linecap: round;
-
-  &.ok {
-    stroke: var(--color-primary);
-  }
-
-  &.warn {
-    stroke: var(--color-danger-text);
-  }
-
-  &.unknown {
-    stroke: var(--color-text-muted);
-  }
+  @include m.chart-transition-color(stroke);
 }
 
 .warn-mark {

@@ -264,6 +264,22 @@
   color: var(--color-danger-text);
 }
 
+/// Couleur d'un enchaînement dans un graphique selon son état : `.ok` bleu, `.warn` rouge, `.unknown` discret.
+/// @param $property propriété colorée : stroke (trait), fill (flèche) ou background (clé de légende)
+@mixin chart-transition-color($property) {
+  &.ok {
+    #{$property}: var(--color-primary);
+  }
+
+  &.warn {
+    #{$property}: var(--color-danger-text);
+  }
+
+  &.unknown {
+    #{$property}: var(--color-text-muted);
+  }
+}
+
 /// Texte d'un enchaînement selon son état (classes de `describeTransition`) : `.ok` et `.unknown` discrets,
 /// `.warn` en rouge.
 @mixin transition-kinds {

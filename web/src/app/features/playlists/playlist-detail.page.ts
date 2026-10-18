@@ -30,6 +30,7 @@ import { TransitionRatingComponent } from '../../shared/transition-rating/transi
 import { BridgeFinderComponent } from './bridge-finder/bridge-finder.component';
 import { OrderProposalComponent } from './order-proposal/order-proposal.component';
 import { PlaylistCurveComponent } from './playlist-curve/playlist-curve.component';
+import { CamelotWheelComponent } from './camelot-wheel/camelot-wheel.component';
 import { FavoriteButtonComponent } from '../../shared/favorite-button/favorite-button.component';
 import { describeTransition } from '../../shared/key-moves';
 import { PlaylistTextFormat, playlistFileName, playlistText } from '../../shared/playlist-text';
@@ -58,6 +59,7 @@ type State =
     BridgeFinderComponent,
     OrderProposalComponent,
     PlaylistCurveComponent,
+    CamelotWheelComponent,
   ],
   templateUrl: './playlist-detail.page.html',
   styleUrl: './playlist-detail.page.scss',

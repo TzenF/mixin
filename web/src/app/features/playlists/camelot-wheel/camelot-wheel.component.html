@@ -1,0 +1,118 @@
+@if (drawable()) {
+  <figure data-testid="wheel">
+    <figcaption>Parcours sur la roue de Camelot</figcaption>
+    <div class="plot">
+      <svg
+        [attr.width]="size"
+        [attr.height]="size"
+        [attr.viewBox]="'0 0 ' + size + ' ' + size"
+        role="img"
+        [attr.aria-label]="summary()"
+        tabindex="0"
+        (focus)="onFocus()"
+        (blur)="active.set(null)"
+        (keydown)="onKeydown($event)"
+        (pointerleave)="active.set(null)"
+        data-testid="wheel-svg"
+      >
+        <circle class="ring" [attr.cx]="center" [attr.cy]="center" [attr.r]="radius.B" />
+        <circle class="ring" [attr.cx]="center" [attr.cy]="center" [attr.r]="radius.A" />
+        @for (number of numbers(); track number.n) {
+          <text
+            class="number"
+            [attr.x]="number.x"
+            [attr.y]="number.y"
+            text-anchor="middle"
+            dy="0.35em"
+          >
+            {{ number.n }}
+          </text>
+        }
+
+        @for (m of moves(); track m.id) {
+          <path
+            [attr.class]="'move ' + m.kind"
+            [attr.d]="m.path"
+            [attr.stroke-width]="m.width"
+            data-testid="wheel-move"
+          />
+        }
+        @for (w of warnings(); track w.id) {
+          <g data-testid="wheel-warning">
+            <circle class="warn-badge" [attr.cx]="w.x" [attr.cy]="w.y" [attr.r]="warningRadius" />
+            <text class="warn-mark" [attr.x]="w.x" [attr.y]="w.y" text-anchor="middle" dy="0.35em">
+              ⚠
+            </text>
+          </g>
+        }
+
+        @for (k of keys(); track k.key) {
+          @if (k.tracks.length === 0) {
+            <circle class="idle" [attr.cx]="k.x" [attr.cy]="k.y" [attr.r]="idleRadius" />
+          } @else {
+            <g
+              class="played"
+              [class.active]="active() === k.key"
+              (pointerenter)="active.set(k.key)"
+            >
+              <circle class="hit" [attr.cx]="k.x" [attr.cy]="k.y" [attr.r]="hitRadius" />
+              <circle
+                class="node"
+                [attr.cx]="k.x"
+                [attr.cy]="k.y"
+                [attr.r]="nodeRadius"
+                data-testid="wheel-played"
+              />
+              <text
+                class="key"
+                [attr.x]="k.label.x"
+                [attr.y]="k.label.y"
+                text-anchor="middle"
+                [attr.dy]="k.tag ? '0' : '0.35em'"
+              >
+                {{ k.key }}
+              </text>
+              @if (k.tag; as tag) {
+                <text
+                  class="tag"
+                  [attr.x]="k.label.x"
+                  [attr.y]="k.label.y"
+                  text-anchor="middle"
+                  dy="1.1em"
+                  data-testid="wheel-end"
+                >
+                  {{ tag }}
+                </text>
+              }
+            </g>
+          }
+        }
+        @for (e of endRings(); track e.key) {
+          <circle class="end-ring" [attr.cx]="e.x" [attr.cy]="e.y" [attr.r]="endRingRadius" />
+        }
+      </svg>
+
+      @if (tooltip(); as t) {
+        <div
+          class="tooltip"
+          [style.left.px]="t.x"
+          [style.top.px]="t.y"
+          role="status"
+          data-testid="wheel-tooltip"
+        >
+          <strong
+            >{{ t.key }} · {{ t.tracks.length }} morceau{{ t.tracks.length > 1 ? 'x' : '' }}</strong
+          >
+          @for (track of t.tracks; track track.place) {
+            <span>{{ track.place }}. {{ track.title }}</span>
+          }
+        </div>
+      }
+    </div>
+    <p class="legend">
+      <span class="line-key ok"></span> tonalité compatible <span class="line-key warn"></span> ⚠
+      tonalité incompatible
+      <span>· trait épais : passage répété</span>
+    </p>
+  </figure>
+}
