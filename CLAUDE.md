@@ -89,8 +89,8 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Appel HTTP vers une API externe | `app/adapters/http_retry.py` → `request_with_retry` (gère les 429 / `Retry-After`) |
 | Chiffrer un jeton avant stockage | `app/adapters/token_cipher.py` → `TokenCipher` (clé `TOKEN_ENCRYPTION_KEY`) |
 | Jeton Spotify valide pour un utilisateur | `app/services/spotify_connection.py` → `SpotifyConnection.access_token(user_id)` |
-| Lire Spotify, y créer / remplacer une playlist | `app/adapters/spotify_provider.py` → `SpotifyProvider` (`create_playlist`, `replace_playlist_items`, `playlist_url`) |
-| Exporter une playlist vers Spotify | `app/services/playlist_export.py` → `PlaylistExporter` (lien gardé dans `playlist_export`) ; route `POST /playlists/{id}/export/spotify` |
+| Lire Spotify, y créer / remplacer une playlist | `app/adapters/spotify_provider.py` → `SpotifyProvider` (`create_playlist`, `replace_playlist_items`, `playlist_url`, `find_track_by_isrc`) |
+| Exporter une playlist vers Spotify | `app/services/playlist_export.py` → `PlaylistExporter` (lien gardé dans `playlist_export` ; morceau sans identifiant Spotify cherché par ISRC, identifiant gardé dans `track_external_id`) ; route `POST /playlists/{id}/export/spotify` |
 | Importer une playlist | `app/services/playlist_import.py` → `PlaylistImporter` |
 | Lancer une analyse | `app/adapters/queue.py` → `TaskQueue.enqueue_analysis` (déjà dédoublonné) |
 | Analyser un morceau (exécuté par le worker) | `app/services/track_analysis.py` → `TrackAnalyzer` |
@@ -218,6 +218,8 @@ réécrite se vérifie avant/après dans une transaction `REPEATABLE READ` (rés
   le seul demandé), `POST /playlists/{id}/items` et `PUT /playlists/{id}/items` (remplace tout) : **100 morceaux
   max par requête**. « Supprimer » une playlist dans Spotify = ne plus la suivre : elle reste modifiable par l'API
   mais invisible ; avant de réexporter, vérifier qu'elle est encore dans `GET /me/playlists`.
+  Recherche par ISRC (vérifié le 18/10/2026) : `GET /search?q=isrc:<ISRC>&type=track` marche, 75/75 morceaux
+  de l'Explorer retrouvés, environ 0,26 s chacun ; plusieurs résultats possibles (single, album) au même ISRC.
 - **Essentia** : aucune version pour Linux ARM → le worker doit tourner en x86_64.
 - « address already in use » au `make up` : changer `DB_PORT`, `REDIS_PORT`, `API_PORT` ou `WEB_PORT` dans `.env`
   (sur la machine de dev, `DB_PORT=5433`). Entre conteneurs, les ports internes ne changent pas.
@@ -328,7 +330,8 @@ V2, dans l'ordre (une étape à la fois, plan validé avant de coder) :
    recopiés chaque jour dans le catalogue et analysés ; badge « Nouveau » et « Nouveaux pour moi seulement ».
    Livraison 1 (lire) : faite. Livraison 2 (ajouter / retirer une source par lien, visible par tous ; refus
    au-delà de 2 000 titres, pas d'autre limite) : faite le 18/10/2026, vérifiée dans le navigateur avec un lien
-   du site. À faire : 3. export Spotify des morceaux venus de Deezer (identifiant Spotify retrouvé par ISRC).
+   du site. Livraison 3 (export Spotify des morceaux venus de Deezer, identifiant retrouvé par ISRC à l'export) :
+   faite le 18/10/2026 ; vrai export pas encore vérifié. Un morceau introuvable est recherché à chaque export.
 
 Prochaines idées (à décider) : corrections globales (admin).
 
