@@ -31,6 +31,15 @@ class ExportRow:
 
 
 @dataclass(frozen=True, slots=True)
+class ExternalTrackRow:
+    """Un morceau d'une playlist à exporter : son ISRC et son identifiant chez le service, s'il en a un."""
+
+    track_id: UUID
+    isrc: str | None
+    external_id: str | None
+
+
+@dataclass(frozen=True, slots=True)
 class TransitionRow:
     """Enchaînement d'un morceau vers le suivant (voir la fonction SQL transition)."""
 
@@ -275,18 +284,19 @@ class PlaylistRepository:
             for r in rows
         ]
 
-    async def external_track_ids(self, playlist_id: UUID, provider: str) -> list[str | None]:
-        """Identifiant de chaque morceau chez ce service, dans l'ordre (None s'il n'y en a pas)."""
+    async def external_track_ids(self, playlist_id: UUID, provider: str) -> list[ExternalTrackRow]:
+        """Chaque morceau, dans l'ordre, avec son ISRC et son identifiant chez ce service (s'il en a un)."""
         rows = await self._db.fetch_all(
-            """SELECT e.external_id
+            """SELECT pi.track_id, t.isrc, e.external_id
                FROM playlist_item pi
+               JOIN track t ON t.id = pi.track_id
                LEFT JOIN track_external_id e
                       ON e.track_id = pi.track_id AND e.provider = %(provider)s::music_provider
                WHERE pi.playlist_id = %(id)s
                ORDER BY pi.position""",
             {"id": playlist_id, "provider": provider},
         )
-        return [r["external_id"] for r in rows]
+        return [ExternalTrackRow(**r) for r in rows]
 
     async def get_export(self, playlist_id: UUID, provider: str) -> ExportRow | None:
         """Dernier export de la playlist vers ce service, ou None."""

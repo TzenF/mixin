@@ -2,6 +2,9 @@
 
 Réexporter met à jour la même playlist chez le service. Si l'utilisateur l'y a supprimée (pour Spotify :
 ne plus la suivre ; elle reste modifiable mais invisible), on en crée une nouvelle.
+
+Un morceau sans identifiant chez le service (venu de l'Explorer, donc de Deezer) y est cherché par ISRC ;
+l'identifiant trouvé est gardé pour tout le monde, un morceau introuvable sera recherché au prochain export.
 """
 
 from __future__ import annotations
@@ -11,7 +14,8 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from app.adapters.db import Database
-from app.adapters.playlist_repository import PlaylistRepository
+from app.adapters.playlist_repository import ExternalTrackRow, PlaylistRepository
+from app.adapters.track_repository import TrackRepository
 from app.domain.music_provider import MusicProvider
 from app.services.playlist_editor import PlaylistReadOnlyError, owned_playlist
 
@@ -44,7 +48,9 @@ class PlaylistExporter:
                 "Playlist importée : elle est déjà sur ce service (exporte plutôt une copie)"
             )
 
-        ids = await repo.external_track_ids(playlist_id, self._provider.name)
+        ids = await self._external_ids(
+            access_token, await repo.external_track_ids(playlist_id, self._provider.name)
+        )
         track_ids = [i for i in ids if i is not None]
         previous = await repo.get_export(playlist_id, self._provider.name)
 
@@ -68,6 +74,23 @@ class PlaylistExporter:
             skipped=len(ids) - len(track_ids),
             exported_at=saved.last_synced_at,
         )
+
+    async def _external_ids(self, access_token: str, rows: list[ExternalTrackRow]) -> list[str | None]:
+        """Identifiant de chaque morceau chez le service ; ceux qui n'en ont pas sont cherchés par ISRC."""
+        tracks = TrackRepository(self._db)
+        found: dict[str, str | None] = {}  # une seule recherche par ISRC, même s'il revient deux fois
+        ids: list[str | None] = []
+        for row in rows:
+            external_id = row.external_id
+            if external_id is None and row.isrc:
+                if row.isrc not in found:
+                    match = await self._provider.find_track_by_isrc(access_token, row.isrc)
+                    if match is not None:
+                        await tracks.add_external_id(row.track_id, self._provider.name, match)
+                    found[row.isrc] = match
+                external_id = found[row.isrc]
+            ids.append(external_id)
+        return ids
 
     async def _still_there(self, access_token: str, external_id: str) -> bool:
         """Indique si la playlist exportée figure encore parmi celles de l'utilisateur chez le service."""

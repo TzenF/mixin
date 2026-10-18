@@ -28,6 +28,13 @@ class FakeSpotify:
     playlists: dict[str, list[str]] = field(default_factory=dict)
     descriptions: dict[str, tuple[str, str]] = field(default_factory=dict)
     replaced: list[str] = field(default_factory=list)
+    by_isrc: dict[str, str] = field(default_factory=dict)
+    searched: list[str] = field(default_factory=list)
+
+    async def find_track_by_isrc(self, access_token: str, isrc: str) -> str | None:
+        """Morceau connu par ISRC (note chaque recherche)."""
+        self.searched.append(isrc)
+        return self.by_isrc.get(isrc)
 
     async def get_user_playlists(self, access_token: str) -> list[ProviderPlaylist]:
         """Playlists encore présentes chez l'utilisateur."""
@@ -174,6 +181,45 @@ async def test_imported_and_foreign_playlists_are_refused(
         await exporter.export(user_id, uuid.UUID(setlists["imported"]), "jeton")
     with pytest.raises(PlaylistMissingError):
         await exporter.export(user_id, uuid.UUID(setlists["other"]), "jeton")
+
+
+@pytest.mark.anyio
+async def test_tracks_without_spotify_id_are_found_by_isrc_once(
+    db: Database, user_id: uuid.UUID, test_prefix: str
+) -> None:
+    p = test_prefix
+    with psycopg.connect(get_settings().database_url, autocommit=True) as conn:
+        found, missing = uuid.uuid4(), uuid.uuid4()  # venus de l'Explorer : pas d'identifiant Spotify
+        conn.execute(
+            "INSERT INTO track (id, title, isrc) VALUES (%s, %s, %s), (%s, %s, %s)",
+            (found, f"{p} trouvé", f"{p}001", missing, f"{p} introuvable", f"{p}002"),
+        )
+        row = conn.execute(
+            "INSERT INTO playlist (owner_id, name) VALUES (%s, %s) RETURNING id", (user_id, f"{p} Explorer")
+        ).fetchone()
+        assert row is not None
+        for position, tid in enumerate([found, missing, found]):
+            conn.execute(
+                "INSERT INTO playlist_item (playlist_id, track_id, position) VALUES (%s, %s, %s)",
+                (row[0], tid, position),
+            )
+    spotify = FakeSpotify(by_isrc={f"{p}001": f"{p}-spF"})
+    exporter = PlaylistExporter(db, spotify)
+
+    first = await exporter.export(user_id, row[0], "jeton")
+
+    assert (first.exported, first.skipped) == (2, 1)
+    assert spotify.playlists[first.external_playlist_id] == [f"{p}-spF", f"{p}-spF"]
+    assert spotify.searched == [f"{p}001", f"{p}002"]  # une recherche par ISRC
+    with psycopg.connect(get_settings().database_url) as conn:
+        saved = conn.execute(
+            "SELECT track_id FROM track_external_id WHERE provider = 'spotify' AND external_id = %s",
+            (f"{p}-spF",),
+        ).fetchone()
+    assert saved == (found,)  # gardé : plus besoin de le chercher
+
+    await exporter.export(user_id, row[0], "jeton")
+    assert spotify.searched == [f"{p}001", f"{p}002", f"{p}002"]  # seul l'introuvable est recherché
 
 
 def _with_fake_spotify(client: TestClient, connection: FakeConnection | None = None) -> FakeSpotify:

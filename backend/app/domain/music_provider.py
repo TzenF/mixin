@@ -55,6 +55,10 @@ class MusicProvider(Protocol):
         """Liste les titres likés de l'utilisateur."""
         ...
 
+    async def find_track_by_isrc(self, access_token: str, isrc: str) -> str | None:
+        """Identifiant chez le fournisseur du morceau qui a exactement cet ISRC, ou None."""
+        ...
+
     async def create_playlist(
         self, access_token: str, name: str, description: str, track_ids: list[str]
     ) -> str:

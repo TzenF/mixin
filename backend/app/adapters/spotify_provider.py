@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlencode
 
 import httpx
 
@@ -83,6 +84,20 @@ class SpotifyProvider:
     async def get_saved_tracks(self, access_token: str) -> list[ProviderTrack]:
         """Titres likés : pas encore implémenté (hors périmètre de l'import de playlists)."""
         raise NotImplementedError("Import des titres likés : prévu à une étape ultérieure")
+
+    async def find_track_by_isrc(self, access_token: str, isrc: str) -> str | None:
+        """Cherche le morceau par ISRC (`q=isrc:…`) ; garde le 1er résultat qui a exactement cet ISRC.
+
+        Vérifié le 18/10/2026 en mode développement : 25 morceaux de l'Explorer retrouvés sur 25 ; plusieurs
+        résultats arrivent souvent (single, album) avec le même ISRC, donc le même enregistrement.
+        """
+        query = urlencode({"q": f"isrc:{isrc}", "type": "track", "limit": 5})
+        found = await self._get(access_token, f"{API}/search?{query}")
+        for item in (found.get("tracks") or {}).get("items") or []:
+            same = ((item or {}).get("external_ids") or {}).get("isrc", "").upper() == isrc.upper()
+            if same and item.get("id"):
+                return str(item["id"])
+        return None
 
     async def create_playlist(
         self, access_token: str, name: str, description: str, track_ids: list[str]

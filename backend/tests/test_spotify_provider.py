@@ -212,3 +212,23 @@ async def test_write_error_is_reported() -> None:
 
 def test_playlist_url() -> None:
     assert SpotifyProvider(httpx.AsyncClient()).playlist_url("abc") == "https://open.spotify.com/playlist/abc"
+
+
+async def test_finds_a_track_by_isrc_keeping_only_an_exact_match() -> None:
+    def respond(request: httpx.Request) -> httpx.Response:
+        """Répond comme GET /search : un résultat voisin, puis le bon (ISRC en minuscules)."""
+        assert (request.url.params["q"], request.url.params["type"]) == ("isrc:NLCK41041964", "track")
+        items = [
+            {"id": "voisin", "external_ids": {"isrc": "NLCK41041965"}},
+            {"id": "bon", "external_ids": {"isrc": "nlck41041964"}},
+        ]
+        return httpx.Response(200, json={"tracks": {"items": items}})
+
+    assert await _api({"/v1/search": respond}).find_track_by_isrc("t", "NLCK41041964") == "bon"
+
+
+async def test_isrc_unknown_to_spotify() -> None:
+    other = {"tracks": {"items": [{"id": "x", "external_ids": {"isrc": "AUTRE0000001"}}]}}
+    assert await _api({"/v1/search": _json(other)}).find_track_by_isrc("t", "NLCK41041964") is None
+    empty = {"tracks": {"items": []}}
+    assert await _api({"/v1/search": _json(empty)}).find_track_by_isrc("t", "NLCK41041964") is None
