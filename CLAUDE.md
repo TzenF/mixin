@@ -84,7 +84,7 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Utilisateurs, comptes musicaux | `app/adapters/user_repository.py` → `UserRepository` |
 | Sessions de connexion | `app/services/sessions.py` → `SessionService` (dépôt : `SessionRepository`) |
 | Playlists en base | `app/adapters/playlist_repository.py` → `PlaylistRepository` (dont `list_for_owner`, `get_for_owner`, `items_with_transitions`) ; routes `GET /playlists`, `GET /playlists/{id}` |
-| Modifier mes playlists (créer, renommer, ajouter, réordonner, retirer, dupliquer, supprimer) | `app/services/playlist_editor.py` → `PlaylistEditor` (importée = lecture seule → 409 ; pas à moi → 404 ; ordre périmé → 422, via `api/errors.py`). Écritures : verrou `PlaylistRepository.lock` dans une transaction |
+| Modifier mes playlists (créer, renommer, ajouter, réordonner, retirer, dupliquer, supprimer) | `app/services/playlist_editor.py` → `PlaylistEditor` (importée = lecture seule → 409 ; pas à moi → 404 ; ordre périmé → 422, via `api/errors.py`). Écritures : verrou `PlaylistRepository.lock` dans une transaction ; `add_track(…, position)` insère à une place (`POST /playlists/{id}/items` avec `position`) |
 | Journal des imports | `app/adapters/import_job_repository.py` → `ImportJobRepository` |
 | Appel HTTP vers une API externe | `app/adapters/http_retry.py` → `request_with_retry` (gère les 429 / `Retry-After`) |
 | Chiffrer un jeton avant stockage | `app/adapters/token_cipher.py` → `TokenCipher` (clé `TOKEN_ENCRYPTION_KEY`) |
@@ -103,8 +103,9 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Dépendances de route | `app/api/deps.py` → `get_db`, `get_queue`, `get_track_repository`, `get_current_user_id` (exige une session) |
 | Erreur de service musical → HTTP | `app/api/errors.py` (404 / 401 / 502, déjà branché) |
 | Valeur BPM/tonalité à afficher | SQL `effective_features(user)` |
-| Règle d'enchaînement entre deux morceaux | SQL `transition(a_bpm, a_num, a_letter, b_bpm, b_num, b_letter, tolerance)` (migrations 003–004) : utilisée par `suggest_tracks` et les playlists |
+| Règle d'enchaînement entre deux morceaux | SQL `transition(a_bpm, a_num, a_letter, b_bpm, b_num, b_letter, tolerance)` (migrations 003–004) : utilisée par `suggest_tracks`, `bridge_tracks` et les playlists ; score d'un enchaînement : SQL `transition_score` (006) ; ligne Python `TransitionRow` (`track_repository.py`), modèle d'API `Transition` (`api/transitions.py`) |
 | Morceaux compatibles | SQL `suggest_tracks(user, seed, tolerance, limit)`, via `TrackRepository.suggestions` (filtre « mes morceaux » appliqué avant la limite) |
+| Morceau pont entre A et B | SQL `bridge_tracks(user, a, b, tolerance, limit)` (score = le plus faible des deux enchaînements), via `TrackRepository.bridges` ; route `GET /tracks/{a}/bridges/{b}` ; front `CatalogService.bridges`, composant `features/playlists/bridge-finder/` |
 | SQL partagé du dépôt des morceaux | `track_repository.py` → `_ARTISTS_SQL` (artistes dans l'ordre), `_MINE_SQL` (« mes morceaux » = mes playlists + mes favoris), `_FAVORITE_SQL`, `_FAVORITES_ONLY_SQL` |
 | Favoris | `TrackRepository.set_favorite` ; routes `PUT` / `DELETE /tracks/{id}/favorite` ; champ `favorite` et filtre `favorites=true` (catalogue, suggestions) |
 | Styles | `web/src/styles/_tokens.scss`, `_mixins.scss` (`page`, `panel`, `status`, `reset-list`, `control`, `button-primary`, `button-secondary`, `button-accent`, `icon-button`, `icon-button-on`, `toolbar`, `card-button`, `badge`, `status(success | danger | accent)`, `progress-bar`, `field`, `filter-bar`, `focus-ring`, `text-muted`, `text-danger`) |
@@ -198,6 +199,7 @@ Ne pas reproposer ces alternatives sans élément nouveau.
 - **Règle d'enchaînement** (fonction SQL `transition`, seul endroit où elle est écrite) et score de tonalité :
   même tonalité 1.00, ±1 cran 0.90, relative (même numéro, autre lettre) 0.85, **diagonale** (±1 cran et autre
   lettre, acceptée le 16/10/2026 : une seule note change) 0.75, ±2 crans 0.50 ; tout le reste est refusé.
+  Le score complet (60 % tonalité pondérée par la confiance, 40 % tempo) n'est écrit que dans `transition_score`.
 
 Migrations : le dossier est monté dans `/docker-entrypoint-initdb.d`, donc **exécuté seulement sur un volume
 vide**. Nouveau fichier numéroté. Pour ne pas effacer les données de dev (`make reset-db` efface tout) : écrire la
@@ -209,6 +211,8 @@ réécrite se vérifie avant/après dans une transaction `REPEATABLE READ` (rés
 
 - **psycopg + fonctions SQL** : caster les paramètres (`%(x)s::uuid`, `::numeric`, `::integer`), sinon
   PostgreSQL ne trouve pas la fonction.
+- **`key_confidence` est un `real`** : une fonction SQL qui le reçoit le prend en `double precision` (un paramètre
+  `numeric` n'est pas trouvé, et convertir en `numeric` changerait le calcul du score).
 - **Spotify, mode développement (règles de février 2026)** : Premium requis pour le propriétaire de l'app,
   5 utilisateurs max. `POST /me/playlists` et `/playlists/{id}/items` (plus `/tracks`) ; dans les réponses,
   `tracks` → `items` et `track` → `item`. Plus de `GET /tracks?ids=` groupé ; recherche limitée à 10 résultats.
@@ -334,8 +338,9 @@ V2, dans l'ordre (une étape à la fois, plan validé avant de coder) :
    faite le 18/10/2026 ; vrai export pas encore vérifié. Un morceau introuvable est recherché à chaque export.
 
 Prochaines idées (proposées le 18/10/2026, dans l'ordre conseillé ; une à la fois, plan validé avant de coder) :
-1. **Morceau pont** : sur un enchaînement refusé A → B d'une playlist, proposer des morceaux C tels que A → C et
-   C → B sont compatibles (règle `transition`), puis l'insérer entre les deux.
+1. ~~**Morceau pont**~~ : fait (18/10/2026). Sur un enchaînement refusé A → B d'une playlist, « Trouver un pont »
+   propose les morceaux C tels que A → C et C → B passent, puis « Insérer ici ». Mesuré : 36 ms pour 5 recherches
+   sur tout le catalogue ; parcours complet dans le navigateur pas encore vérifié.
 2. **Chemin entre deux morceaux** : de A à B en 3 à 6 morceaux compatibles (recherche dans le graphe des
    enchaînements, limitée à « mes morceaux » pour rester rapide) ; généralise le pont.
 3. **Réordonner une playlist** : proposer l'ordre qui maximise le score des enchaînements (heuristique, 20 à
