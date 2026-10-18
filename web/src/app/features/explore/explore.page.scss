@@ -5,6 +5,10 @@ main {
   @include m.page;
 }
 
+.add {
+  @include m.filter-bar;
+}
+
 .hint {
   @include m.text-muted;
 }

@@ -160,3 +160,47 @@ async def test_playlist_details() -> None:
     body = {"id": 1109890291, "title": "Top France", "creator": {"name": "Deezer Charts"}, "nb_tracks": 100}
     playlist = await _deezer(lambda _req: httpx.Response(200, json=body)).playlist("1109890291")
     assert playlist == DeezerPlaylist("1109890291", "Top France", "Deezer Charts", 100)
+
+
+async def test_private_playlist() -> None:
+    body = {"id": 7, "title": "Perso", "creator": {"name": "moi"}, "nb_tracks": 3, "public": False}
+    playlist = await _deezer(lambda _req: httpx.Response(200, json=body)).playlist("7")
+    assert playlist is not None and playlist.public is False
+
+
+SHORT = "https://link.deezer.com/s/32Qt0aV30k82TqqNUzQcB"
+
+
+async def test_short_link_leads_to_the_destination_without_following_redirects() -> None:
+    # 1re réponse réelle (relevée le 18/10/2026), raccourcie
+    dest = "https://www.deezer.com/playlist/1183071761?host=1814354222&utm_source=user_sharing"
+    location = (
+        "https://link.deezer.com/?awf=https%3A%2F%2Fwww.deezer.com%2Fplaylist%2F1183071761"
+        "&dest=https%3A%2F%2Fwww.deezer.com%2Fplaylist%2F1183071761%3Fhost%3D1814354222%26utm_source%3Duser_sharing"
+    )
+    calls: list[str] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        """Répond comme link.deezer.com."""
+        calls.append(str(request.url))
+        return httpx.Response(301, headers={"location": location})
+
+    assert await _deezer(respond).resolve_short_link(SHORT) == dest
+    assert calls == [SHORT]  # une seule requête
+
+
+async def test_dead_short_link_leads_to_the_404_page() -> None:
+    page = "https://www.deezer.com/deezer-links-404"
+    deezer = _deezer(lambda _req: httpx.Response(302, headers={"location": page}))
+    assert await deezer.resolve_short_link(SHORT) == page
+
+
+async def test_short_link_without_redirect_or_from_elsewhere() -> None:
+    def respond(_request: httpx.Request) -> httpx.Response:
+        """Ne devrait pas être appelé pour un lien qui n'est pas un lien court."""
+        raise AssertionError("appel inattendu")
+
+    assert await _deezer(respond).resolve_short_link("https://example.com/s/abc") is None
+    assert await _deezer(lambda _req: httpx.Response(200, text="page")).resolve_short_link(SHORT) is None
+    with pytest.raises(DeezerUnavailableError):
+        await _deezer(lambda _req: httpx.Response(503)).resolve_short_link(SHORT)

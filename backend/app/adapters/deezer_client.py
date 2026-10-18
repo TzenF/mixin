@@ -12,11 +12,12 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote, urlsplit
+from urllib.parse import parse_qs, quote, urlsplit
 
 import httpx
 
 from app.adapters.http_retry import request_with_retry
+from app.domain.deezer_link import SHORT_LINK_HOST, is_short_link
 from app.domain.music_provider import ProviderTrack
 
 DEEZER_API = "https://api.deezer.com"
@@ -51,6 +52,7 @@ class DeezerPlaylist:
     title: str
     curator: str | None
     track_count: int
+    public: bool = True
 
 
 class DeezerClient:
@@ -95,7 +97,30 @@ class DeezerClient:
             title=data.get("title") or "",
             curator=(data.get("creator") or {}).get("name"),
             track_count=int(data.get("nb_tracks") or 0),
+            public=data.get("public") is not False,
         )
+
+    async def resolve_short_link(self, url: str) -> str | None:
+        """URL où mène un lien court de l'app (`link.deezer.com/s/…`) ; None s'il ne mène nulle part.
+
+        Une seule requête, sans suivre les redirections (vérifié le 18/10/2026) : la 1re réponse est un 301
+        vers `link.deezer.com/?dest=<URL du site>&…` ; un lien mort ou expiré, un 302 vers `deezer-links-404`.
+        """
+        if not is_short_link(url):
+            return None
+        try:
+            resp = await self._client.get(url, follow_redirects=False, timeout=10)
+        except httpx.HTTPError as e:
+            raise DeezerUnavailableError(f"Lien Deezer injoignable : {e.__class__.__name__}") from e
+        if resp.status_code >= 500 or resp.status_code == 429:
+            raise DeezerUnavailableError(f"Lien Deezer : HTTP {resp.status_code}")
+        location = resp.headers.get("location") if resp.is_redirect else None
+        if not location:
+            return None
+        parts = urlsplit(location)
+        if parts.hostname == SHORT_LINK_HOST:
+            return (parse_qs(parts.query).get("dest") or [None])[0]
+        return location
 
     async def playlist_tracks(self, playlist_id: str) -> list[ProviderTrack] | None:
         """Morceaux d'une playlist publique, dans l'ordre (ISRC, artiste principal) ; None si inconnue."""

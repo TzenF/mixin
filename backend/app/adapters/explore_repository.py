@@ -64,6 +64,45 @@ class ExploreRepository:
         )
         return [r["id"] for r in rows]
 
+    async def add(
+        self, provider: str, external_id: str, title: str, curator: str | None, added_by: UUID
+    ) -> UUID:
+        """Ajoute la source et renvoie son identifiant ; si elle existe déjà, renvoie celui de l'existante."""
+        row = await self._db.fetch_one(
+            """WITH added AS (
+                   INSERT INTO explore_source (provider, external_id, title, curator, added_by)
+                   VALUES (%(provider)s::music_provider, %(external_id)s, %(title)s, %(curator)s,
+                           %(added_by)s)
+                   ON CONFLICT (provider, external_id) DO NOTHING
+                   RETURNING id
+               )
+               SELECT id FROM added
+               UNION ALL
+               SELECT id FROM explore_source
+               WHERE provider = %(provider)s::music_provider AND external_id = %(external_id)s
+               LIMIT 1""",
+            {
+                "provider": provider,
+                "external_id": external_id,
+                "title": title,
+                "curator": curator,
+                "added_by": added_by,
+            },
+        )
+        assert row is not None
+        return row["id"]
+
+    async def remove(self, source_id: UUID, user_id: UUID) -> bool:
+        """Retire une source que j'ai ajoutée (pas une source par défaut) ; faux si rien n'a été retiré.
+
+        Son classement part avec elle ; ses morceaux restent dans le catalogue.
+        """
+        row = await self._db.fetch_one(
+            "DELETE FROM explore_source WHERE id = %(id)s AND added_by = %(user)s RETURNING id",
+            {"id": source_id, "user": user_id},
+        )
+        return row is not None
+
     async def lock_sync(self) -> None:
         """Une seule synchronisation à la fois jusqu'à la fin de la transaction.
 

@@ -204,6 +204,86 @@ describe('ExplorePage', () => {
     expect(all(fixture, 'source-error')[0].textContent).toContain('Deezer indisponible');
   });
 
+  it("ajoute une playlist par lien, puis l'affiche en préparation", async () => {
+    setup();
+    const fixture = await render();
+    const input = all(fixture, 'new-source-link')[0] as HTMLInputElement;
+    input.value = '  https://link.deezer.com/s/32Qt0aV30k82TqqNUzQcB ';
+    all(fixture, 'add-source')[0].click();
+    const req = http.expectOne('/api/explore/sources');
+    expect([req.request.method, req.request.body]).toEqual([
+      'POST',
+      { link: 'https://link.deezer.com/s/32Qt0aV30k82TqqNUzQcB' },
+    ]);
+    const mine: ExploreSource = {
+      ...TOP,
+      id: 'mine',
+      title: 'Ma playlist',
+      last_synced_at: null,
+      track_count: 0,
+      removable: true,
+    };
+    req.flush(mine);
+    http.expectOne('/api/explore/sources').flush([TOP, TECHNO, mine]);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    tracksRequest().flush({ total: 0, items: [] });
+    await fixture.whenStable();
+
+    expect(input.value).toBe('');
+    expect(navigate).toHaveBeenCalledWith(
+      [],
+      expect.objectContaining({ queryParams: { source: 'mine' } }),
+    );
+    expect(all(fixture, 'source')[2].getAttribute('aria-pressed')).toBe('true');
+    expect(all(fixture, 'source')[2].textContent).toContain('en préparation');
+    expect(all(fixture, 'remove').length).toBe(1);
+  });
+
+  it("affiche le refus d'un lien", async () => {
+    setup();
+    const fixture = await render();
+    (all(fixture, 'new-source-link')[0] as HTMLInputElement).value = 'https://open.spotify.com/x';
+    all(fixture, 'add-source')[0].click();
+    http
+      .expectOne('/api/explore/sources')
+      .flush(
+        { detail: "Ce n'est pas un lien de playlist Deezer (ou le lien a expiré)" },
+        { status: 422, statusText: '' },
+      );
+    fixture.detectChanges();
+
+    expect(all(fixture, 'add-error')[0].textContent).toContain('pas un lien de playlist Deezer');
+  });
+
+  it("retire une source que j'ai ajoutée et revient à la première", async () => {
+    setup({ source: 'mine' });
+    const mine: ExploreSource = { ...TOP, id: 'mine', title: 'Ma playlist', removable: true };
+    const fixture = TestBed.createComponent(ExplorePage);
+    fixture.detectChanges();
+    http.expectOne('/api/explore/sources').flush([TOP, mine]);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    tracksRequest().flush({ total: 0, items: [] });
+    await fixture.whenStable();
+
+    all(fixture, 'remove')[0].click();
+    const req = http.expectOne('/api/explore/sources/mine');
+    expect(req.request.method).toBe('DELETE');
+    req.flush(null);
+    http.expectOne('/api/explore/sources').flush([TOP]);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    tracksRequest().flush({ total: 0, items: [] });
+    await fixture.whenStable();
+
+    expect(all(fixture, 'source').map((s) => s.textContent?.includes('Top France'))).toEqual([
+      true,
+    ]);
+    expect(all(fixture, 'remove').length).toBe(0); // Top France est une source par défaut
+    expect(all(fixture, 'notice')[0].textContent).toContain('a été retirée');
+  });
+
   it('propose de se connecter sur une réponse 401', async () => {
     setup();
     const fixture = TestBed.createComponent(ExplorePage);

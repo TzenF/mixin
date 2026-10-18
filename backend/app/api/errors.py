@@ -10,6 +10,7 @@ from app.adapters.spotify_auth import SpotifyAuthError
 from app.adapters.spotify_provider import SpotifyApiError
 from app.adapters.token_cipher import TokenCipherError
 from app.domain.music_provider import MusicProviderError, PlaylistNotFoundError
+from app.services.explore import ExploreSourceMissingError, InvalidSourceError
 from app.services.playlist_editor import (
     OrderMismatchError,
     PlaylistMissingError,
@@ -46,7 +47,7 @@ async def _cipher_error(request: Request, exc: Exception) -> JSONResponse:
 
 
 async def _not_found(request: Request, exc: Exception) -> JSONResponse:
-    """Réponse 404 : playlist (pas à moi ou inexistante) ou morceau inconnu."""
+    """Réponse 404 : playlist (pas à moi ou inexistante), morceau ou source de l'Explorer inconnus."""
     return JSONResponse({"detail": str(exc)}, status_code=status.HTTP_404_NOT_FOUND)
 
 
@@ -57,6 +58,11 @@ async def _read_only(request: Request, exc: Exception) -> JSONResponse:
 
 async def _stale_order(request: Request, exc: Exception) -> JSONResponse:
     """Réponse 422 : l'ordre envoyé ne correspond plus au contenu de la playlist."""
+    return JSONResponse({"detail": str(exc)}, status_code=status.HTTP_422_UNPROCESSABLE_CONTENT)
+
+
+async def _invalid_source(request: Request, exc: Exception) -> JSONResponse:
+    """Réponse 422 : le lien collé ne peut pas devenir une source de l'Explorer."""
     return JSONResponse({"detail": str(exc)}, status_code=status.HTTP_422_UNPROCESSABLE_CONTENT)
 
 
@@ -84,4 +90,6 @@ def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(PlaylistReadOnlyError, _read_only)
     app.add_exception_handler(OrderMismatchError, _stale_order)
     app.add_exception_handler(PreviewUnavailableError, _no_preview)
+    app.add_exception_handler(ExploreSourceMissingError, _not_found)
+    app.add_exception_handler(InvalidSourceError, _invalid_source)
     app.add_exception_handler(DeezerUnavailableError, _deezer_down)

@@ -28,6 +28,16 @@ export class ExploreService {
     return this.http.get<ExploreSource[]>('/api/explore/sources');
   }
 
+  /** Ajoute la playlist Deezer de ce lien (site, lien court de l'app ou identifiant) ; renvoie la source. */
+  add(link: string): Observable<ExploreSource> {
+    return this.http.post<ExploreSource>('/api/explore/sources', { link });
+  }
+
+  /** Retire une source que j'ai ajoutée (ses morceaux restent dans le catalogue). */
+  remove(sourceId: string): Observable<void> {
+    return this.http.delete<void>(`/api/explore/sources/${encodeURIComponent(sourceId)}`);
+  }
+
   /** Met à jour la source depuis Deezer (par le worker). */
   refresh(sourceId: string): Observable<{ queued: boolean }> {
     return this.http.post<{ queued: boolean }>(

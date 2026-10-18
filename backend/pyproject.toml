@@ -28,6 +28,8 @@ include = ["app*"]
 [tool.ruff]
 line-length = 110
 target-version = "py313"
+# `pip install .` laisse dans l'image une copie figée du code (build/lib) : ne pas la vérifier.
+extend-exclude = ["build"]
 
 [tool.ruff.lint]
 # D101-D103 : docstring obligatoire sur chaque classe, méthode et fonction publique (règle du projet).

@@ -3,16 +3,19 @@
 import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from typing import Annotated
 
 import psycopg
 import pytest
+from fastapi import Depends
 from fastapi.testclient import TestClient
 
 from app.adapters.db import Database
-from app.adapters.deezer_client import DeezerUnavailableError
+from app.adapters.deezer_client import DeezerPlaylist, DeezerUnavailableError
+from app.api.deps import get_db, get_explore_sync
 from app.config import get_settings
 from app.domain.music_provider import ProviderTrack
-from app.services.explore import ExploreSync
+from app.services.explore import ExploreSourceMissingError, ExploreSync, InvalidSourceError
 from tests.conftest import requires_services
 
 pytestmark = requires_services
@@ -24,6 +27,18 @@ class FakeDeezer:
 
     tracks: list[ProviderTrack] | None = None
     down: bool = False
+    details: DeezerPlaylist | None = None
+    short_links: dict[str, str] = field(default_factory=dict)
+    asked: list[str] = field(default_factory=list)
+
+    async def playlist(self, playlist_id: str) -> DeezerPlaylist | None:
+        """Détails de la playlist (note l'identifiant demandé)."""
+        self.asked.append(playlist_id)
+        return self.details
+
+    async def resolve_short_link(self, url: str) -> str | None:
+        """Destination d'un lien court connu."""
+        return self.short_links.get(url)
 
     async def playlist_tracks(self, playlist_id: str) -> list[ProviderTrack] | None:
         """Morceaux de la playlist."""
@@ -184,3 +199,105 @@ def test_refresh_queues_the_sync(logged_in_client: TestClient, source: str) -> N
 def test_explore_requires_a_session(client: TestClient) -> None:
     assert client.get("/explore/sources").status_code == 401
     assert client.post(f"/explore/sources/{uuid.uuid4()}/refresh").status_code == 401
+    assert client.post("/explore/sources", json={"link": "1109890291"}).status_code == 401
+    assert client.delete(f"/explore/sources/{uuid.uuid4()}").status_code == 401
+
+
+@pytest.fixture
+def cleanup_sources(test_prefix: str) -> Iterator[None]:
+    """Efface les sources ajoutées par le test (identifiant Deezer préfixé)."""
+    yield
+    with psycopg.connect(get_settings().database_url, autocommit=True) as conn:
+        conn.execute("DELETE FROM explore_source WHERE external_id LIKE %s", (f"{test_prefix}%",))
+
+
+def _details(prefix: str, *, public: bool = True, size: int = 50) -> DeezerPlaylist:
+    """Playlist Deezer de test."""
+    return DeezerPlaylist(f"{prefix}-pl", f"{prefix} Ma playlist", "Quelqu'un", size, public)
+
+
+@pytest.mark.anyio
+@pytest.mark.usefixtures("cleanup_sources")
+async def test_add_source_from_a_link_or_a_short_link_without_duplicates(
+    db: Database, user_id: uuid.UUID, test_prefix: str
+) -> None:
+    short = "https://link.deezer.com/s/abc"
+    deezer = FakeDeezer(
+        details=_details(test_prefix),
+        short_links={short: "https://www.deezer.com/playlist/1183071761?host=1&utm_source=user_sharing"},
+    )
+    explore = ExploreSync(db, deezer, FakeQueue())
+
+    first = await explore.add_source(user_id, "https://www.deezer.com/fr/playlist/1183071761")
+    again = await explore.add_source(user_id, short)
+
+    assert first == again
+    assert deezer.asked == ["1183071761", "1183071761"]
+    with psycopg.connect(get_settings().database_url) as conn:
+        row = conn.execute(
+            "SELECT title, curator, added_by, last_synced_at FROM explore_source WHERE id = %s", (first,)
+        ).fetchone()
+    assert row == (f"{test_prefix} Ma playlist", "Quelqu'un", user_id, None)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("link", "details", "error"),
+    [
+        ("https://www.deezer.com/fr/track/2651012", "ok", InvalidSourceError),
+        ("https://link.deezer.com/s/expire", "ok", InvalidSourceError),  # mène à deezer-links-404
+        ("1183071761", "private", InvalidSourceError),
+        ("1183071761", "huge", InvalidSourceError),
+        ("1183071761", None, ExploreSourceMissingError),
+    ],
+)
+async def test_add_source_refusals(
+    db: Database, user_id: uuid.UUID, test_prefix: str, link: str, details: str | None, error: type[Exception]
+) -> None:
+    playlist = {
+        "ok": _details(test_prefix),
+        "private": _details(test_prefix, public=False),
+        "huge": _details(test_prefix, size=2001),
+        None: None,
+    }[details]
+    deezer = FakeDeezer(
+        details=playlist,
+        short_links={"https://link.deezer.com/s/expire": "https://www.deezer.com/deezer-links-404"},
+    )
+    with pytest.raises(error):
+        await ExploreSync(db, deezer, FakeQueue()).add_source(user_id, link)
+
+
+@pytest.mark.usefixtures("cleanup_sources")
+def test_add_and_remove_a_source_through_the_api(
+    logged_in_client: TestClient, user_id: uuid.UUID, test_prefix: str, source: str
+) -> None:
+    deezer = FakeDeezer(details=_details(test_prefix))
+
+    def explore(db: Annotated[Database, Depends(get_db)]) -> ExploreSync:
+        """Service de l'Explorer branché sur le faux Deezer (la base reste la vraie)."""
+        return ExploreSync(db, deezer, FakeQueue())
+
+    logged_in_client.app.dependency_overrides[get_explore_sync] = explore
+
+    resp = logged_in_client.post("/explore/sources", json={"link": "https://www.deezer.com/playlist/42"})
+    assert resp.status_code == 200
+    added = resp.json()
+    assert (added["title"], added["removable"], added["last_synced_at"]) == (
+        f"{test_prefix} Ma playlist",
+        True,
+        None,
+    )
+    assert logged_in_client.post("/explore/sources", json={"link": "42"}).json()["id"] == added["id"]
+
+    refused = logged_in_client.post("/explore/sources", json={"link": "https://open.spotify.com/playlist/1"})
+    assert refused.status_code == 422 and "playlist Deezer" in refused.json()["detail"]
+    assert logged_in_client.post("/explore/sources", json={"link": ""}).status_code == 422
+    deezer.details = None
+    assert logged_in_client.post("/explore/sources", json={"link": "43"}).status_code == 404
+
+    assert logged_in_client.delete(f"/explore/sources/{source}").status_code == 404  # source par défaut
+    assert logged_in_client.delete(f"/explore/sources/{added['id']}").status_code == 204
+    assert logged_in_client.delete(f"/explore/sources/{added['id']}").status_code == 404
+    ids = {s["id"] for s in logged_in_client.get("/explore/sources").json()}
+    assert added["id"] not in ids and source in ids

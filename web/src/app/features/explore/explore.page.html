@@ -2,7 +2,8 @@
   <h1>Explorer</h1>
   <p class="hint">
     Des morceaux à découvrir dans les tops et les playlists éditoriales de Deezer, mis à jour chaque
-    jour. Un morceau « Nouveau » n'est encore ni dans tes playlists ni dans tes favoris.
+    jour. Un morceau « Nouveau » n'est encore ni dans tes playlists ni dans tes favoris. Une
+    playlist ajoutée ici apparaît dans l'Explorer de tout le monde.
   </p>
 
   @switch (state().kind) {
@@ -20,6 +21,25 @@
   }
 
   @if (sources(); as sources) {
+    <form class="add" novalidate (submit)="$event.preventDefault(); add(link)">
+      <label>
+        Ajouter une playlist Deezer
+        <input
+          #link
+          type="text"
+          maxlength="500"
+          placeholder="Lien du site ou de l'app"
+          data-testid="new-source-link"
+        />
+      </label>
+      <button type="submit" [disabled]="adding()" data-testid="add-source">
+        {{ adding() ? 'Ajout…' : 'Ajouter' }}
+      </button>
+    </form>
+    @if (addError(); as message) {
+      <p class="error" data-testid="add-error">{{ message }}</p>
+    }
+
     <nav class="sources" aria-label="Sources" data-testid="sources">
       @for (source of sources; track source.id) {
         <button
@@ -56,6 +76,11 @@
         <button type="button" class="secondary" (click)="refresh(source)" data-testid="refresh">
           Actualiser
         </button>
+        @if (source.removable) {
+          <button type="button" class="secondary" (click)="remove(source)" data-testid="remove">
+            Retirer
+          </button>
+        }
         @if (notice(); as message) {
           <span class="hint" data-testid="notice">{{ message }}</span>
         }

@@ -18,6 +18,7 @@ from app.adapters.spotify_provider import SpotifyProvider
 from app.adapters.token_cipher import TokenCipher
 from app.adapters.track_repository import TrackRepository
 from app.config import Settings
+from app.services.explore import ExploreSync
 from app.services.playlist_editor import PlaylistEditor
 from app.services.playlist_export import PlaylistExporter
 from app.services.playlist_import import PlaylistImporter
@@ -137,3 +138,12 @@ def get_rating_repository(db: Annotated[Database, Depends(get_db)]) -> RatingRep
 def get_explore_repository(db: Annotated[Database, Depends(get_db)]) -> ExploreRepository:
     """Fournit le dépôt des sources de l'Explorer."""
     return ExploreRepository(db)
+
+
+def get_explore_sync(
+    db: Annotated[Database, Depends(get_db)],
+    client: Annotated[httpx.AsyncClient, Depends(get_http_client)],
+    queue: Annotated[TaskQueue, Depends(get_queue)],
+) -> ExploreSync:
+    """Fournit le service de l'Explorer (ajout de sources par lien)."""
+    return ExploreSync(db, DeezerClient(client), queue)

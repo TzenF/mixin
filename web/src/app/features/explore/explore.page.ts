@@ -33,8 +33,12 @@ export class ExplorePage {
   protected readonly state = signal<State>({ kind: 'loading' });
   /** Source choisie (dans l'URL : ?source=…), ou la première. */
   private readonly chosen = signal<string | null>(this.route.snapshot.queryParamMap.get('source'));
-  /** Message après « Actualiser », ou null. */
+  /** Message après « Actualiser » ou « Retirer », ou null. */
   protected readonly notice = signal<string | null>(null);
+  /** Vrai pendant l'ajout d'une source (Deezer peut mettre quelques secondes à répondre). */
+  protected readonly adding = signal(false);
+  /** Erreur du dernier ajout, ou null. */
+  protected readonly addError = signal<string | null>(null);
   private poll: ReturnType<typeof setInterval> | undefined;
 
   /** Sources affichées, ou null tant qu'elles ne sont pas chargées. */
@@ -92,6 +96,46 @@ export class ExplorePage {
       relativeTo: this.route,
       queryParams: { source: source.id },
       replaceUrl: true,
+    });
+  }
+
+  /** Ajoute la playlist Deezer du lien collé, puis l'affiche (« en préparation… » le temps de la recopier). */
+  protected add(linkInput: HTMLInputElement): void {
+    const link = linkInput.value.trim();
+    if (link === '' || this.adding()) {
+      return;
+    }
+    this.adding.set(true);
+    this.addError.set(null);
+    this.explore.add(link).subscribe({
+      next: (source) => {
+        this.adding.set(false);
+        linkInput.value = '';
+        this.choose(source);
+        this.load();
+      },
+      error: (err: HttpErrorResponse) => {
+        this.adding.set(false);
+        this.addError.set(apiErrorMessage(err, "Impossible d'ajouter cette playlist."));
+      },
+    });
+  }
+
+  /** Retire une source que j'ai ajoutée ; on revient alors à la première source. */
+  protected remove(source: ExploreSource): void {
+    this.explore.remove(source.id).subscribe({
+      next: () => {
+        this.chosen.set(null);
+        this.notice.set(`« ${source.title} » a été retirée de l'Explorer.`);
+        void this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: { source: null },
+          replaceUrl: true,
+        });
+        this.load();
+      },
+      error: (err: HttpErrorResponse) =>
+        this.notice.set(apiErrorMessage(err, 'Impossible de retirer cette source.')),
     });
   }
 
