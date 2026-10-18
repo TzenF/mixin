@@ -30,6 +30,8 @@ class CatalogFilters:
     favorites_only: bool = False
     only_new: bool = False  # seulement ce qui n'est pas à moi (ni dans mes playlists, ni en favori)
     source_id: UUID | None = None  # seulement les morceaux de cette source de l'Explorer
+    fits_playlist: UUID | None = None  # compter les liens avec cette playlist (fit_count)
+    fits_only: bool = False  # seulement les morceaux qui s'enchaînent avec fits_playlist
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +50,9 @@ class CatalogRow:
     favorite: bool
     mine: bool  # dans une de mes playlists ou en favori
     rank: int | None = None  # place dans la source de l'Explorer (1 = premier), None hors source
+    fit_count: int | None = (
+        None  # morceaux de la playlist demandée avec lesquels il s'enchaîne (playlist_fit)
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,10 +174,12 @@ _CATALOG_FROM = f"""
 FROM track t
 LEFT JOIN effective_features(%(user_id)s::uuid) f ON f.track_id = t.id
 LEFT JOIN explore_item ei ON ei.track_id = t.id AND ei.source_id = %(source_id)s::uuid
+LEFT JOIN playlist_fit(%(user_id)s::uuid, %(fits_playlist)s::uuid) pf ON pf.track_id = t.id
 WHERE {_MINE_SQL}
   AND {_FAVORITES_ONLY_SQL}
   AND (NOT %(only_new)s OR NOT {_IS_MINE_SQL})
   AND (%(source_id)s::uuid IS NULL OR ei.source_id IS NOT NULL)
+  AND (NOT %(fits_only)s OR pf.track_id IS NOT NULL)
   AND (%(track_id)s::uuid IS NULL OR t.id = %(track_id)s::uuid)
   AND (%(text)s::text IS NULL OR t.title ILIKE %(text)s OR EXISTS (
           SELECT 1 FROM track_artist ta JOIN artist a ON a.id = ta.artist_id
@@ -196,7 +203,7 @@ TRACK_COLUMNS_SQL = f"""
        {_IS_MINE_SQL} AS mine
 """
 
-_CATALOG_SELECT = f"SELECT {TRACK_COLUMNS_SQL}, ei.position + 1 AS rank"
+_CATALOG_SELECT = f"SELECT {TRACK_COLUMNS_SQL}, ei.position + 1 AS rank, pf.fit_count"
 
 # Liste fermée : le tri est inséré tel quel dans le SQL, jamais une valeur venue de la requête HTTP.
 _CATALOG_ORDER: dict[CatalogSort, str] = {
@@ -259,6 +266,8 @@ class TrackRepository:
             "favorites_only": filters.favorites_only,
             "only_new": filters.only_new,
             "source_id": filters.source_id,
+            "fits_playlist": filters.fits_playlist,
+            "fits_only": filters.fits_only,
         }
         # Deux requêtes : le total reste juste même quand la page demandée est vide.
         total = await self._db.fetch_one(f"SELECT count(*) AS n {_CATALOG_FROM}", params)

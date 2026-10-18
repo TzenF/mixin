@@ -9,9 +9,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 
 from app.adapters.db import Database
+from app.adapters.playlist_repository import PlaylistRepository
 from app.adapters.queue import TaskQueue
 from app.adapters.track_repository import CatalogFilters, CatalogSort, TrackRepository
-from app.api.deps import get_current_user_id, get_db, get_preview_service, get_queue, get_track_repository
+from app.api.deps import (
+    get_current_user_id,
+    get_db,
+    get_playlist_repository,
+    get_preview_service,
+    get_queue,
+    get_track_repository,
+)
 from app.api.transitions import RatingOut, Transition
 from app.domain.camelot import CamelotKey
 from app.services.preview import PreviewService
@@ -49,6 +57,7 @@ class CatalogTrack(BaseModel):
     favorite: bool
     mine: bool
     rank: int | None = None
+    fit_count: int | None = None
 
 
 class Catalog(BaseModel):
@@ -61,6 +70,7 @@ class Catalog(BaseModel):
 @router.get("")
 async def catalog(
     tracks: Tracks,
+    playlists: Annotated[PlaylistRepository, Depends(get_playlist_repository)],
     user_id: CurrentUser,
     scope: Literal["mine", "all", "new"] = "mine",
     q: Annotated[str | None, Query(max_length=100)] = None,
@@ -73,8 +83,18 @@ async def catalog(
     offset: Annotated[int, Query(ge=0)] = 0,
     favorites: bool = False,
     source: Annotated[UUID | None, Query(description="Source de l'Explorer")] = None,
+    fits: Annotated[UUID | None, Query(description="Ma playlist : liens de chaque morceau avec elle")] = None,
+    fits_only: bool = False,
 ) -> Catalog:
-    """Liste les morceaux (les miens, tous, ou les nouveaux pour moi), filtrés et triés, page par page."""
+    """Liste les morceaux (les miens, tous, ou les nouveaux pour moi), filtrés et triés, page par page.
+
+    Avec `fits` (une de mes playlists), chaque morceau reçoit `fit_count` : avec combien de ses morceaux il
+    s'enchaîne ; `fits_only` ne garde que ceux qui s'enchaînent avec au moins un.
+    """
+    if fits_only and fits is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "fits_only demande une playlist (fits)")
+    if fits is not None and await playlists.get_for_owner(user_id, fits) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Playlist inconnue")
     try:
         camelot = CamelotKey.parse(key) if key else None
     except ValueError as e:
@@ -94,6 +114,8 @@ async def catalog(
             limit=limit,
             offset=offset,
             favorites_only=favorites,
+            fits_playlist=fits,
+            fits_only=fits_only,
         ),
     )
     return Catalog(total=page.total, items=[CatalogTrack(**asdict(r)) for r in page.items])

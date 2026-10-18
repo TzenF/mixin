@@ -25,6 +25,8 @@ export interface CatalogTrack {
   mine: boolean;
   /** Place dans la source de l'Explorer (1 = premier), null hors source. */
   rank?: number | null;
+  /** Avec combien de morceaux de la playlist demandée (`fitsPlaylist`) il s'enchaîne ; null : aucun ou déjà dedans. */
+  fit_count?: number | null;
 }
 
 /** Une page du catalogue ; total = nombre de morceaux qui passent les filtres. */
@@ -132,6 +134,10 @@ export interface CatalogQuery {
   favoritesOnly: boolean;
   /** Seulement les morceaux de cette source de l'Explorer, ou null. */
   source: string | null;
+  /** Playlist (la playlist en cours) avec laquelle compter les enchaînements de chaque morceau, ou null. */
+  fitsPlaylist: string | null;
+  /** Seulement les morceaux qui s'enchaînent avec `fitsPlaylist`. */
+  fitsOnly: boolean;
 }
 
 /** Catalogue des morceaux : les miens (playlists importées) ou tous. */
@@ -163,6 +169,12 @@ export class CatalogService {
     }
     if (query.source !== null) {
       params = params.set('source', query.source);
+    }
+    if (query.fitsPlaylist !== null) {
+      params = params.set('fits', query.fitsPlaylist);
+      if (query.fitsOnly) {
+        params = params.set('fits_only', true);
+      }
     }
     return this.http.get<CatalogPage>('/api/tracks', { params });
   }

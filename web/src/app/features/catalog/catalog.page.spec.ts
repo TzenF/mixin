@@ -38,16 +38,18 @@ const PENDING: CatalogTrack = {
 describe('CatalogPage', () => {
   let http: HttpTestingController;
   let navigate: ReturnType<typeof vi.fn>;
+  let currentPlaylist: FakeCurrentPlaylistService;
 
   /** Configure le module de test ; `query` simule les paramètres de l'URL. */
   function setup(query: Record<string, string> = {}): void {
     navigate = vi.fn().mockResolvedValue(true);
+    currentPlaylist = new FakeCurrentPlaylistService();
     TestBed.configureTestingModule({
       imports: [CatalogPage],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: CurrentPlaylistService, useValue: new FakeCurrentPlaylistService() },
+        { provide: CurrentPlaylistService, useValue: currentPlaylist },
         { provide: AudioPlayerService, useValue: new FakeAudioPlayerService() },
         { provide: Router, useValue: { navigate } },
         {
@@ -238,6 +240,49 @@ describe('CatalogPage', () => {
       [],
       expect.objectContaining({ queryParams: expect.objectContaining({ favorites: 1 }) }),
     );
+  });
+
+  it('sans playlist en cours, la case « S’enchaîne avec » est désactivée et rien n’est compté', async () => {
+    setup();
+    const fixture = await render();
+
+    expect(byTestId<HTMLInputElement>(fixture, 'fits-only')?.disabled).toBe(true);
+    expect(byTestId(fixture, 'fit-badge')).toBeNull();
+  });
+
+  it('compte les liens avec la playlist en cours, puis filtre dessus', async () => {
+    setup();
+    currentPlaylist.select('current');
+    const fixture = TestBed.createComponent(CatalogPage);
+    fixture.detectChanges();
+    const first = pending();
+    expect(paramsOf(first)).toMatchObject({ fits: 'current' });
+    expect(paramsOf(first)['fits_only']).toBeUndefined();
+    first.flush({ total: 2, items: [{ ...ALPHA, fit_count: 3 }, PENDING] });
+    await fixture.whenStable();
+
+    const badge = byTestId(fixture, 'fit-badge');
+    expect(badge?.textContent?.trim()).toBe('↔ 3 morceaux'); // pas une place dans la playlist
+    expect(badge?.title).toContain('3 morceaux de ta playlist en cours');
+
+    const box = byTestId<HTMLInputElement>(fixture, 'fits-only')!;
+    box.checked = true;
+    box.dispatchEvent(new Event('change'));
+    expect(paramsOf(pending())).toMatchObject({ fits: 'current', fits_only: 'true', offset: '0' });
+    expect(navigate).toHaveBeenLastCalledWith(
+      [],
+      expect.objectContaining({ queryParams: expect.objectContaining({ fits: 1 }) }),
+    );
+  });
+
+  it('recompte quand la playlist en cours change', async () => {
+    setup();
+    const fixture = await render();
+    currentPlaylist.select('current');
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(paramsOf(pending())).toMatchObject({ fits: 'current' });
   });
 
   it('affiche ★ sur chaque ligne', async () => {

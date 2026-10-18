@@ -31,6 +31,26 @@
     Favoris seulement
   </label>
 
+  <label
+    class="toggle"
+    [title]="
+      currentPlaylist.current() === null
+        ? 'Choisis une playlist en cours'
+        : 'Seulement les morceaux qui s\'enchaînent avec « ' +
+          currentPlaylist.current()?.name +
+          ' »'
+    "
+  >
+    <input
+      type="checkbox"
+      [checked]="query().fitsOnly"
+      [disabled]="currentPlaylist.current() === null"
+      (change)="setFitsOnly(checkedOf($event))"
+      data-testid="fits-only"
+    />
+    S'enchaîne avec ma playlist en cours
+  </label>
+
   <label>
     Recherche
     <input
@@ -157,6 +177,20 @@
               {{ track.title }}
               @if (mode() === 'explore' && !track.mine) {
                 <span class="badge new" data-testid="new-badge">Nouveau</span>
+              }
+              @if (track.fit_count; as count) {
+                <span
+                  class="badge fit"
+                  [title]="
+                    'S\'enchaîne avec ' +
+                    count +
+                    ' morceau' +
+                    (count > 1 ? 'x' : '') +
+                    ' de ta playlist en cours'
+                  "
+                  data-testid="fit-badge"
+                  >↔ {{ count }} morceau{{ count > 1 ? 'x' : '' }}</span
+                >
               }
             </td>
             <td class="muted">{{ track.artists.join(', ') }}</td>

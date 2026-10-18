@@ -1,6 +1,16 @@
 import { DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, DestroyRef, OnInit, computed, inject, input, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  OnInit,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+  untracked,
+} from '@angular/core';
 import { ActivatedRoute, ParamMap, Params, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { apiErrorMessage } from '../../core/api/api-error';
@@ -13,6 +23,7 @@ import {
   CatalogSort,
   CatalogTrack,
 } from '../../core/api/catalog.service';
+import { CurrentPlaylistService } from '../../core/current-playlist.service';
 import { AddToPlaylistComponent } from '../add-to-playlist/add-to-playlist.component';
 import { TrackCorrectionComponent } from '../track-correction/track-correction.component';
 import { PlayButtonComponent } from '../play-button/play-button.component';
@@ -73,6 +84,9 @@ export class TrackBrowserComponent implements OnInit {
   private readonly catalog = inject(CatalogService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  /** Playlist en cours : chaque morceau dit avec combien de ses morceaux il s'enchaîne. */
+  protected readonly currentPlaylist = inject(CurrentPlaylistService);
+  private initialized = false;
 
   protected readonly loginUrl = SPOTIFY_LOGIN_URL;
   protected readonly statuses = STATUSES;
@@ -127,15 +141,29 @@ export class TrackBrowserComponent implements OnInit {
       clearTimeout(this.searchTimer);
       this.request?.unsubscribe();
     });
+    // La playlist en cours arrive après le chargement (ou change) : les liens sont recomptés.
+    effect(() => {
+      const id = this.currentPlaylist.current()?.id ?? null;
+      untracked(() => {
+        if (this.initialized && id !== this.query().fitsPlaylist) {
+          this.applyFilters({ fitsPlaylist: id, fitsOnly: id !== null && this.query().fitsOnly });
+        }
+      });
+    });
   }
 
   /** Lit les filtres dans l'URL (selon le mode et la source reçus) puis charge la première page. */
   ngOnInit(): void {
     const defaults = DEFAULTS[this.mode()];
+    const fromUrl = queryFromUrl(this.route.snapshot.queryParamMap, defaults);
+    const current = this.currentPlaylist.current()?.id ?? null;
     this.query.set({
-      ...queryFromUrl(this.route.snapshot.queryParamMap, defaults),
+      ...fromUrl,
       source: this.source(),
+      fitsPlaylist: current,
+      fitsOnly: current !== null && fromUrl.fitsOnly,
     });
+    this.initialized = true;
     this.load();
   }
 
@@ -160,6 +188,11 @@ export class TrackBrowserComponent implements OnInit {
   /** N'affiche que mes favoris (ou tout). */
   protected setFavoritesOnly(favoritesOnly: boolean): void {
     this.applyFilters({ favoritesOnly });
+  }
+
+  /** N'affiche que les morceaux qui s'enchaînent avec la playlist en cours (ou tout). */
+  protected setFitsOnly(fitsOnly: boolean): void {
+    this.applyFilters({ fitsOnly });
   }
 
   /** Bascule entre mes morceaux et tous les morceaux de la base. */
@@ -310,6 +343,8 @@ function queryFromUrl(params: ParamMap, defaults: Defaults): CatalogQuery {
     sort: isSort(sort) ? sort : defaults.sort,
     favoritesOnly: params.get('favorites') === '1',
     source: null,
+    fitsPlaylist: null,
+    fitsOnly: params.get('fits') === '1',
     limit: PAGE_SIZE,
     offset: (page - 1) * PAGE_SIZE,
   };
@@ -327,6 +362,7 @@ function queryToUrl(query: CatalogQuery, defaults: Defaults): Params {
     status: query.status || null,
     sort: query.sort === defaults.sort ? null : query.sort,
     favorites: query.favoritesOnly ? 1 : null,
+    fits: query.fitsOnly ? 1 : null,
     page: page > 1 ? page : null,
   };
 }

@@ -83,3 +83,8 @@ button.flip {
 .badge.new {
   @include m.status(accent);
 }
+
+// S'enchaîne avec la playlist en cours : bonne nouvelle, en vert.
+.badge.fit {
+  @include m.status(success);
+}

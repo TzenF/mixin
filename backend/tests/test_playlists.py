@@ -264,6 +264,44 @@ def test_order_proposal(logged_in_client: TestClient, playlists: dict[str, str],
     assert len(_detail(logged_in_client, playlists["mine"])["items"]) == 5  # rien n'a été modifié
 
 
+def test_catalog_counts_links_with_a_playlist(
+    logged_in_client: TestClient, playlists: dict[str, str], test_prefix: str
+) -> None:
+    # Set = A (124, 6A), B (125, 7A), C (135, 7A), D (pas analysé), E (124, 12A)
+    with psycopg.connect(get_settings().database_url, autocommit=True) as conn:
+        for title, bpm, num, letter in [("X", 124.5, 6, "B"), ("Y", 100, 1, "A")]:
+            tid = uuid.uuid4()
+            conn.execute("INSERT INTO track (id, title) VALUES (%s, %s)", (tid, f"{test_prefix} {title}"))
+            conn.execute(
+                """INSERT INTO track_analysis
+                       (track_id, source, bpm, camelot_num, camelot_letter, key_confidence)
+                   VALUES (%s, 'essentia', %s, %s, %s, 0.9)""",
+                (tid, bpm, num, letter),
+            )
+
+    def fits(only: bool) -> dict[str, int | None]:
+        """Titres du test (sans préfixe) et leur nombre de liens avec « Set »."""
+        params: dict[str, str | bool] = {
+            "scope": "all",
+            "q": test_prefix,
+            "fits": playlists["mine"],
+            "limit": 50,
+        }
+        if only:
+            params["fits_only"] = True
+        body = logged_in_client.get("/tracks", params=params).json()
+        return {i["title"].removeprefix(f"{test_prefix} "): i["fit_count"] for i in body["items"]}
+
+    # X : relative de A et diagonale de B (dans un sens ou dans l'autre) ; Y : rien ; A est déjà dans Set
+    assert fits(only=True) == {"X": 2}
+    assert fits(only=False)["X"] == 2
+    assert fits(only=False)["Y"] is None and fits(only=False)["A"] is None
+
+    other = logged_in_client.get("/tracks", params={"fits": playlists["other"]})
+    assert other.status_code == 404
+    assert logged_in_client.get("/tracks", params={"fits_only": True}).status_code == 422
+
+
 def test_imported_playlists_are_read_only(
     logged_in_client: TestClient, playlists: dict[str, str], test_prefix: str
 ) -> None:
