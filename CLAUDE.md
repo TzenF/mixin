@@ -124,9 +124,10 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Bouton « + Ajouter », barre « Playlist en cours » | `web/src/app/shared/add-to-playlist/`, `web/src/app/shared/current-playlist-bar/` |
 | Libellés et texte d'un enchaînement, écart de BPM signé (front) | `web/src/app/shared/key-moves.ts` → `KEY_MOVE_LABELS`, `formatBpmChange`, `describeTransition` |
 | Playlist en texte (TXT détaillé ou tracklist) | `web/src/app/shared/playlist-text.ts` → `playlistText`, `playlistFileName` (généré côté front : pas de route API) |
-| Explorer : sources (tops, éditoriales Deezer) | `app/adapters/explore_repository.py` → `ExploreRepository` ; `services/explore.py` → `ExploreSync` (tâche worker `sync_explore_source`, cron quotidien 5 h UTC) ; routes `GET /explore/sources`, `POST /explore/sources/{id}/refresh` ; morceaux d'une source = `GET /tracks?source=…&scope=all&sort=rank` |
+| Explorer : sources (tops, éditoriales Deezer) | `app/adapters/explore_repository.py` → `ExploreRepository` ; `services/explore.py` → `ExploreSync` (tâche worker `sync_explore_source`, cron quotidien 5 h UTC) ; routes `GET /explore/sources`, `POST /explore/sources/{id}/refresh` ; ajout par lien `ExploreSync.add_source` (`POST /explore/sources`, refus 422 `InvalidSourceError`) ; retrait de mes sources `ExploreRepository.remove` (`DELETE /explore/sources/{id}`) ; morceaux d'une source = `GET /tracks?source=…&scope=all&sort=rank` |
 | Enregistrer des morceaux venus d'un service (ISRC, puis identifiant) | `services/track_import.py` → `save_provider_tracks` (import Spotify et Explorer) |
-| Lire une playlist publique Deezer | `DeezerClient.playlist`, `.playlist_tracks` (ISRC, extrait, artiste principal) |
+| Lire une playlist publique Deezer | `DeezerClient.playlist` (dont `public`), `.playlist_tracks` (ISRC, extrait, artiste principal) |
+| Lien de playlist Deezer collé (site, app, ID seul) | `app/domain/deezer_link.py` → `playlist_id_from_link`, `is_short_link` ; lien de l'app : `DeezerClient.resolve_short_link` |
 | Liste de morceaux filtrable (front) | `web/src/app/shared/track-browser/` (`mode="catalog"` ou `"explore"`, `[source]`) : utilisée par le Catalogue et l'Explorer |
 | Faire télécharger un fichier par le navigateur | `web/src/app/core/file-download.service.ts` → `FileDownloadService.saveText` |
 | Catalogue côté front | `web/src/app/core/api/catalog.service.ts` → `CatalogService` (`tracks`, `track`, `suggestions`, `flipMode`) |
@@ -221,6 +222,9 @@ réécrite se vérifie avant/après dans une transaction `REPEATABLE READ` (rés
 - « address already in use » au `make up` : changer `DB_PORT`, `REDIS_PORT`, `API_PORT` ou `WEB_PORT` dans `.env`
   (sur la machine de dev, `DB_PORT=5433`). Entre conteneurs, les ports internes ne changent pas.
 - Ruff ne vérifie pas les docstrings dans un module dont le nom commence par `_`.
+- **`pyproject.toml` n'est pas monté** dans le conteneur (seuls `app/` et `tests/` le sont) : après l'avoir
+  modifié, `make up` pour reconstruire. `pip install .` laisse aussi une copie figée du code dans `build/lib`,
+  exclue de ruff (`extend-exclude`).
 - **Front sur `http://127.0.0.1:4200`, jamais `localhost`** : la redirect URI Spotify et le cookie de session en
   dépendent. L'OAuth passe par le proxy Angular (`/api/auth/spotify/callback`) pour que front et API partagent
   la même origine.
@@ -251,6 +255,11 @@ réécrite se vérifie avant/après dans une transaction `REPEATABLE READ` (rés
 - **Spotify refuse les playlists des autres** (vérifié le 17/10/2026) : ses playlists éditoriales (Top 50…)
   répondent 404, une playlist publique d'un autre utilisateur 403. Découverte = **Deezer**
   (`GET /playlist/{id}/tracks` : ISRC, extrait, mais **artiste principal seulement**, sans les « feat. »).
+- **Liens Deezer partagés par l'app** (vérifié le 18/10/2026 sur de vrais liens) : `https://link.deezer.com/s/<code>`
+  répond **301** vers `link.deezer.com/?dest=<URL du site encodée>&…` → une seule requête, sans suivre la suite.
+  Lien mort ou expiré : 302 vers `www.deezer.com/deezer-links-404`. L'ancien format `deezer.page.link` est mort
+  (404). Playlist privée : refusée si `public` est faux, **non testé** (pas de compte Deezer). Le créateur d'une
+  playlist d'utilisateur peut s'appeler « Anonymous ».
 - **Synchronisations de l'Explorer en série** (`ExploreRepository.lock_sync`) : deux tops qui partagent des morceaux,
   recopiés en parallèle, donnaient un `DeadlockDetected`. Elles passent **devant** les analyses dans la file
   (`TaskQueue.enqueue_explore_sync` : heure prévue 6 h dans le passé ; jamais un jour ou plus, Redis refuse).
@@ -317,8 +326,9 @@ V2, dans l'ordre (une étape à la fois, plan validé avant de coder) :
 
 5. **Explorer** (`/explore`, demandé le 17/10/2026) : tops et playlists éditoriales **Deezer** (Spotify les refuse),
    recopiés chaque jour dans le catalogue et analysés ; badge « Nouveau » et « Nouveaux pour moi seulement ».
-   Livraison 1 (lire) : faite. À faire : 2. ajouter / retirer une source par lien ; 3. export Spotify des morceaux
-   venus de Deezer (identifiant Spotify retrouvé par ISRC).
+   Livraison 1 (lire) : faite. Livraison 2 (ajouter / retirer une source par lien, visible par tous ; refus
+   au-delà de 2 000 titres, pas d'autre limite) : faite le 18/10/2026, vérifiée dans le navigateur avec un lien
+   du site. À faire : 3. export Spotify des morceaux venus de Deezer (identifiant Spotify retrouvé par ISRC).
 
 Prochaines idées (à décider) : corrections globales (admin).
 
