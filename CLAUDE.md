@@ -109,12 +109,14 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Courbe du BPM d'une playlist (SVG, sans dépendance) | `web/src/app/features/playlists/playlist-curve/` (segments colorés par `describeTransition`, ⚠ sur les refusés, survol et clavier, largeur mesurée par `ResizeObserver`) ; jetons `$chart-stroke-width`, `$chart-hairline`, `$chart-ring-width`, `$width-tooltip` |
 | Roue de Camelot d'une playlist (SVG, sans dépendance) | `web/src/app/features/playlists/camelot-wheel/` (tonalités jouées, un trait par paire, épaisseur = passages répétés, rouge + ⚠ si tonalité incompatible, début / fin) ; à côté de la courbe (`.charts` dans la page de détail) |
 | Durée du set, tenir le créneau | `playlist.slot_minutes`, `.played_percent` (migration 009) ; `app/domain/set_cut.py` → `suggest_cuts`, `set_quality` ; `services/set_duration.py` → `SetCutter` ; route `GET /playlists/{id}/cut-proposal` ; front `web/src/app/shared/duration.ts` (`formatDuration`, `formatClock`, `playedDuration`), composant `features/playlists/set-duration/` |
+| Carte de ma bibliothèque | `TrackRepository.library_map` ; route `GET /tracks/library-map` ; page `web/src/app/features/library/` (`key-heatmap`, `bpm-histogram`) ; `CatalogService.libraryMap` |
+| Géométrie de la roue de Camelot (front) | `web/src/app/shared/camelot-geometry.ts` → `CAMELOT_KEYS`, `ringOf`, `wheelPoint` (roue des playlists et carte de chaleur) |
 | Proposer un ordre pour une playlist | `app/domain/reorder.py` → `best_order`, `order_quality` ; `services/playlist_reorder.py` → `PlaylistReorderer` ; route `GET /playlists/{id}/order/proposal` (appliquer = `PUT /playlists/{id}/order`) ; front `PlaylistService.proposeOrder`, composant `features/playlists/order-proposal/` |
 | Plusieurs morceaux par identifiant (valeurs vues par moi) | `TrackRepository.by_ids(user, ids)` |
 | Morceau pont entre A et B | SQL `bridge_tracks(user, a, b, tolerance, limit)` (score = le plus faible des deux enchaînements), via `TrackRepository.bridges` ; route `GET /tracks/{a}/bridges/{b}` ; front `CatalogService.bridges`, composant `features/playlists/bridge-finder/` |
 | SQL partagé du dépôt des morceaux | `track_repository.py` → `_ARTISTS_SQL` (artistes dans l'ordre), `_MINE_SQL` (« mes morceaux » = mes playlists + mes favoris), `_FAVORITE_SQL`, `_FAVORITES_ONLY_SQL` |
 | Favoris | `TrackRepository.set_favorite` ; routes `PUT` / `DELETE /tracks/{id}/favorite` ; champ `favorite` et filtre `favorites=true` (catalogue, suggestions) |
-| Styles | `web/src/styles/_tokens.scss`, `_mixins.scss` (`page`, `panel`, `status`, `reset-list`, `control`, `button-primary`, `button-secondary`, `button-accent`, `icon-button`, `icon-button-on`, `toolbar`, `card-button`, `badge`, `status(success | danger | accent)`, `progress-bar`, `field`, `filter-bar`, `focus-ring`, `text-muted`, `text-danger`, `transition-kinds` (texte d'un enchaînement), `chart-transition-color(propriété)` (trait / flèche / légende d'un enchaînement dans un graphique)) ; jeton `$font-size-xs` |
+| Styles | `web/src/styles/_tokens.scss`, `_mixins.scss` (`page`, `panel`, `status`, `reset-list`, `control`, `button-primary`, `button-secondary`, `button-accent`, `icon-button`, `icon-button-on`, `toolbar`, `card-button`, `badge`, `status(success | danger | accent)`, `progress-bar`, `field`, `filter-bar`, `focus-ring`, `text-muted`, `text-danger`, `transition-kinds` (texte d'un enchaînement), `chart-transition-color(propriété)` (trait / flèche / légende d'un enchaînement dans un graphique), `chart-figure` (cadre + titre d'un graphique), `chart-tooltip`, `chart-row` (graphiques côte à côte, `.grow`), `heat-step(propriété)` (paliers d'une carte de chaleur)) ; gamme `--color-seq-1` à `5` (validée) ; jeton `$font-size-xs` |
 | Message d'erreur d'API (front) | `web/src/app/core/api/api-error.ts` → `apiErrorMessage` |
 | Session côté front | `web/src/app/core/api/auth.service.ts` → `AuthService`, `SPOTIFY_LOGIN_URL` |
 | Menu principal | `web/src/app/app.ts` → `NAV_LINKS` (ajouter une page ici et dans `app.routes.ts`) |
@@ -383,8 +385,10 @@ Idées suivantes (retenues le 18/10/2026, dans l'ordre ; une à la fois, plan va
    qui répare un ⚠, puis ce qui casse le moins, le plus long à égalité ; jamais l'ouverture ni le dernier
    morceau), puis « Retirer ces morceaux » (tout ou rien). Peut retirer un morceau de plus que nécessaire (choix
    par dégâts, pas par durée). Rendu dans le navigateur pas encore vérifié.
-2. **Carte de ma bibliothèque** : roue de Camelot en carte de chaleur (morceaux par tonalité) et histogramme des
-   BPM ; un trou (tonalité ou plage de BPM absente) ouvre l'Explorer filtré dessus.
+2. ~~**Carte de ma bibliothèque**~~ : fait (18/10/2026), page `/library`. Roue en carte de chaleur (5 paliers de
+   bleu) et histogramme des BPM (tranches de 2) ; chaque case ou tranche ouvre le catalogue filtré (tous les
+   morceaux). Mesuré : les 24 tonalités sont présentes (3 à 45 morceaux) → la carte montre surtout les tonalités
+   pauvres (les majeures). BPM pris tels quels (½ / ×2 non ramenés) : plages vides signalées entre 90 et 160 seulement.
 3. **Annuler la dernière modification d'une playlist** (ordre appliqué, pont, chemin, « Insérer ici »).
 4. **Compteur sur l'accueil** : « N nouveaux morceaux de l'Explorer rentrent dans ton set en cours »
    (`playlist_fit`).
