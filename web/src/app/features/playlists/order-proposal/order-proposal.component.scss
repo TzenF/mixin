@@ -1,0 +1,48 @@
+@use 'mixins' as m;
+@use 'tokens' as t;
+
+:host {
+  display: block;
+  margin-bottom: t.$space-4;
+}
+
+.panel {
+  @include m.panel;
+  margin-top: t.$space-2;
+  border: t.$border-width solid var(--color-border);
+}
+
+.hint {
+  @include m.text-muted;
+}
+
+.error {
+  @include m.text-danger;
+}
+
+.toolbar {
+  @include m.toolbar;
+}
+
+ol {
+  margin: 0 0 t.$space-3;
+  padding-left: t.$space-6;
+}
+
+li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: t.$space-2;
+  padding: t.$space-1 0;
+}
+
+.title {
+  font-weight: t.$font-weight-bold;
+}
+
+// L'enchaînement vers le morceau suivant, sur sa propre ligne.
+.step {
+  flex-basis: 100%;
+  font-size: t.$font-size-sm;
+  @include m.transition-kinds;
+}

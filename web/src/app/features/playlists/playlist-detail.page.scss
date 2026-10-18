@@ -67,18 +67,7 @@ ol {
 .transition {
   margin: t.$space-1 0 t.$space-1 t.$space-6;
   font-size: t.$font-size-sm;
-
-  &.ok {
-    @include m.text-muted;
-  }
-
-  &.warn {
-    @include m.text-danger;
-  }
-
-  &.unknown {
-    @include m.text-muted;
-  }
+  @include m.transition-kinds;
 }
 
 .rename {

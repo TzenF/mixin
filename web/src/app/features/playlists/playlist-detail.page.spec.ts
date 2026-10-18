@@ -329,6 +329,26 @@ describe('PlaylistDetailPage', () => {
     http.expectOne('/api/playlists/set').flush(PLAYLIST); // enchaînements recalculés
   });
 
+  it('propose un ordre sur une playlist modifiable, et recharge après « Appliquer »', async () => {
+    const fixture = await render((req) => req.flush(PLAYLIST));
+    all(fixture, 'propose-order')[0].click();
+    http.expectOne('/api/playlists/set/order/proposal').flush({
+      item_ids: [3, 2, 1],
+      before: { refused: 1, mean_score: 0.4 },
+      after: { refused: 0, mean_score: 0.8 },
+      unanalysed: 0,
+      steps: [
+        { transition: GOOD, score: 0.8 },
+        { transition: GOOD, score: 0.8 },
+      ],
+    });
+    fixture.detectChanges();
+    all(fixture, 'apply-order')[0].click();
+    http.expectOne('/api/playlists/set/order').flush(null);
+
+    http.expectOne('/api/playlists/set').flush(PLAYLIST);
+  });
+
   it('une importée ne se réordonne pas et ne se modifie pas', async () => {
     const fixture = await render((req) => req.flush({ ...PLAYLIST, source_provider: 'spotify' }));
 

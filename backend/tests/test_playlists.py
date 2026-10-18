@@ -241,6 +241,29 @@ def test_insert_several_tracks_at_once(
     assert logged_in_client.post(imported, json={"track_ids": [a], "position": 0}).status_code == 409
 
 
+def test_order_proposal(logged_in_client: TestClient, playlists: dict[str, str], test_prefix: str) -> None:
+    # Set = A (124, 6A), B (125, 7A), C (135, 7A), D (pas analysé), E (124, 12A)
+    resp = logged_in_client.get(f"/playlists/{playlists['mine']}/order/proposal")
+    assert resp.status_code == 200
+    body = resp.json()
+    items = {
+        i["item_id"]: i["track"]["title"].removeprefix(f"{test_prefix} ")
+        for i in _detail(logged_in_client, playlists["mine"])["items"]
+    }
+    proposed = [items[i] for i in body["item_ids"]]
+    assert sorted(proposed) == ["A", "B", "C", "D", "E"] and proposed[-1] == "D"  # non analysé : en fin
+    # A <-> B est le seul enchaînement compatible (dans les deux sens) : ils doivent être voisins
+    assert abs(proposed.index("A") - proposed.index("B")) == 1
+    assert body["unanalysed"] == 1 and len(body["steps"]) == 3
+    assert body["after"]["refused"] <= body["before"]["refused"]
+    assert [s["transition"] is None for s in body["steps"]].count(False) == 1  # seul A <-> B passe
+
+    imported = logged_in_client.get(f"/playlists/{playlists['imported']}/order/proposal")
+    assert imported.status_code == 409
+    assert logged_in_client.get(f"/playlists/{playlists['other']}/order/proposal").status_code == 404
+    assert len(_detail(logged_in_client, playlists["mine"])["items"]) == 5  # rien n'a été modifié
+
+
 def test_imported_playlists_are_read_only(
     logged_in_client: TestClient, playlists: dict[str, str], test_prefix: str
 ) -> None:

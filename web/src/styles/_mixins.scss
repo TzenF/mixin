@@ -263,3 +263,16 @@
 @mixin text-danger {
   color: var(--color-danger-text);
 }
+
+/// Texte d'un enchaînement selon son état (classes de `describeTransition`) : `.ok` et `.unknown` discrets,
+/// `.warn` en rouge.
+@mixin transition-kinds {
+  &.ok,
+  &.unknown {
+    @include text-muted;
+  }
+
+  &.warn {
+    @include text-danger;
+  }
+}

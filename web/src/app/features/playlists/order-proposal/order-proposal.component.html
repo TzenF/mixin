@@ -1,0 +1,51 @@
+<button type="button" class="secondary" (click)="toggle()" data-testid="propose-order">
+  {{ state().kind === 'closed' ? 'Proposer un ordre' : "Fermer l'aperçu" }}
+</button>
+
+@switch (state().kind) {
+  @case ('loading') {
+    <p class="hint">Calcul de l'ordre…</p>
+  }
+  @case ('error') {
+    <p class="error" data-testid="order-error">{{ errorMessage() }}</p>
+  }
+}
+
+@if (proposal(); as p) {
+  <div class="panel" data-testid="order-proposal">
+    <p data-testid="order-summary">
+      Enchaînements ⚠ : {{ p.before.refused }} → {{ p.after.refused }} · score moyen
+      {{ p.before.mean_score | number: '1.2-2' }} → {{ p.after.mean_score | number: '1.2-2' }}
+      @if (p.unanalysed > 0) {
+        · {{ p.unanalysed }} non analysé{{ p.unanalysed > 1 ? 's' : '' }}, placé{{
+          p.unanalysed > 1 ? 's' : ''
+        }}
+        en fin
+      }
+    </p>
+    <p class="hint">
+      Ordre calculé sur la tonalité et le BPM seulement : il ne sait pas construire une montée.
+    </p>
+    @if (unchanged()) {
+      <p class="hint" data-testid="order-unchanged">L'ordre actuel est déjà le meilleur trouvé.</p>
+    } @else {
+      <ol>
+        @for (row of rows(); track row.item.item_id) {
+          <li data-testid="proposed-item">
+            <span class="title">{{ row.item.track.title }}</span>
+            <span class="hint">{{ row.item.track.artists.join(', ') }}</span>
+            @if (row.next; as next) {
+              <span [class]="'step ' + next.kind">{{ next.text }}</span>
+            }
+          </li>
+        }
+      </ol>
+      <p class="toolbar">
+        <button type="button" [disabled]="applying()" (click)="apply(p)" data-testid="apply-order">
+          Appliquer
+        </button>
+        <button type="button" class="secondary" (click)="toggle()">Annuler</button>
+      </p>
+    }
+  </div>
+}

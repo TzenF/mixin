@@ -135,6 +135,10 @@
       }
     </p>
 
+    @if (playlist.source_provider === null && playlist.items.length > 2) {
+      <app-order-proposal [playlist]="playlist" (applied)="onOrderApplied()" />
+    }
+
     @if (playlist.items.length === 0) {
       <p class="hint" data-testid="empty">Cette playlist est vide.</p>
     } @else {

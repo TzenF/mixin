@@ -3,6 +3,23 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { CatalogTrack, KeyMove, TransitionRating } from './catalog.service';
 
+/** Bilan d'un ordre : enchaînements refusés et score moyen (morceaux analysés seulement). */
+export interface OrderQuality {
+  refused: number;
+  mean_score: number;
+}
+
+/** Ordre proposé pour une playlist (voir backend/app/api/playlists.py), à appliquer avec `reorder`. */
+export interface OrderProposal {
+  item_ids: number[];
+  before: OrderQuality;
+  after: OrderQuality;
+  /** Morceaux non analysés, placés en fin. */
+  unanalysed: number;
+  /** Enchaînement entre morceaux analysés consécutifs de l'ordre proposé ; transition null = refusé. */
+  steps: { transition: Transition | null; score: number | null }[];
+}
+
 /** Une playlist ; source_provider null = créée ici, sinon importée (lecture seule). */
 export interface PlaylistSummary {
   id: string;
@@ -128,6 +145,13 @@ export class PlaylistService {
     return this.http.put<void>(`/api/playlists/${encodeURIComponent(playlistId)}/order`, {
       item_ids: itemIds,
     });
+  }
+
+  /** Ordre proposé (ouverture comprise) et bilan avant / après ; rien n'est modifié. */
+  proposeOrder(playlistId: string): Observable<OrderProposal> {
+    return this.http.get<OrderProposal>(
+      `/api/playlists/${encodeURIComponent(playlistId)}/order/proposal`,
+    );
   }
 
   /** Retire un morceau de la playlist (les suivants remontent d'une place). */

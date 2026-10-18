@@ -28,6 +28,7 @@ import {
 } from '../../shared/play-transition-button/play-transition-button.component';
 import { TransitionRatingComponent } from '../../shared/transition-rating/transition-rating.component';
 import { BridgeFinderComponent } from './bridge-finder/bridge-finder.component';
+import { OrderProposalComponent } from './order-proposal/order-proposal.component';
 import { FavoriteButtonComponent } from '../../shared/favorite-button/favorite-button.component';
 import { describeTransition } from '../../shared/key-moves';
 import { PlaylistTextFormat, playlistFileName, playlistText } from '../../shared/playlist-text';
@@ -54,6 +55,7 @@ type State =
     PlayTransitionButtonComponent,
     TransitionRatingComponent,
     BridgeFinderComponent,
+    OrderProposalComponent,
   ],
   templateUrl: './playlist-detail.page.html',
   styleUrl: './playlist-detail.page.scss',
@@ -133,6 +135,11 @@ export class PlaylistDetailPage {
   protected onBridgeInserted(): void {
     this.reload();
     this.refreshCurrentPlaylist();
+  }
+
+  /** Après « Appliquer » sur un ordre proposé : nouveaux enchaînements. */
+  protected onOrderApplied(): void {
+    this.reload();
   }
 
   /** Si cette playlist est la playlist en cours, recharge la liste de ses morceaux. */

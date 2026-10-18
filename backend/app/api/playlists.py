@@ -14,14 +14,17 @@ from app.api.deps import (
     get_current_user_id,
     get_playlist_editor,
     get_playlist_exporter,
+    get_playlist_reorderer,
     get_playlist_repository,
     get_spotify_connection,
     get_spotify_provider,
 )
 from app.api.tracks import DEFAULT_BPM_TOLERANCE, CatalogTrack
 from app.api.transitions import RatingOut, Transition
+from app.domain.reorder import OrderQuality
 from app.services.playlist_editor import PlaylistEditor
 from app.services.playlist_export import PlaylistExporter
+from app.services.playlist_reorder import PlaylistReorderer
 from app.services.spotify_connection import SpotifyConnection
 
 router = APIRouter(prefix="/playlists", tags=["playlists"])
@@ -174,6 +177,61 @@ class NewOrder(BaseModel):
     """Tous les éléments de la playlist (item_id), dans le nouvel ordre."""
 
     item_ids: list[int]
+
+
+class OrderQualityOut(BaseModel):
+    """Bilan d'un ordre : enchaînements refusés et score moyen par enchaînement (morceaux analysés)."""
+
+    refused: int
+    mean_score: float
+
+
+class OrderStep(BaseModel):
+    """Enchaînement entre deux morceaux consécutifs de l'ordre proposé ; transition null = refusé."""
+
+    transition: Transition | None
+    score: float | None
+
+
+class OrderProposal(BaseModel):
+    """Ordre proposé (à appliquer avec PUT …/order) et bilan avant / après ; rien n'est encore modifié."""
+
+    item_ids: list[int]
+    before: OrderQualityOut
+    after: OrderQualityOut
+    unanalysed: int
+    steps: list[OrderStep]
+
+
+def _quality(quality: OrderQuality, transitions: int) -> OrderQualityOut:
+    """Bilan affiché : refus et score moyen par enchaînement (un refusé compte 0)."""
+    return OrderQualityOut(
+        refused=quality.refused,
+        mean_score=round(quality.total_score / transitions, 3) if transitions else 0.0,
+    )
+
+
+@router.get("/{playlist_id}/order/proposal")
+async def propose_order(
+    playlist_id: UUID,
+    reorderer: Annotated[PlaylistReorderer, Depends(get_playlist_reorderer)],
+    user_id: CurrentUser,
+) -> OrderProposal:
+    """Propose l'ordre qui enchaîne le mieux (ouverture comprise) ; 404 si pas à moi, 409 si importée."""
+    proposal = await reorderer.propose(user_id, playlist_id, DEFAULT_BPM_TOLERANCE)
+    transitions = len(proposal.steps)
+    return OrderProposal(
+        item_ids=proposal.item_ids,
+        before=_quality(proposal.before, transitions),
+        after=_quality(proposal.after, transitions),
+        unanalysed=proposal.unanalysed,
+        steps=[
+            OrderStep(transition=Transition(**asdict(s.transition)), score=s.score)
+            if s is not None
+            else OrderStep(transition=None, score=None)
+            for s in proposal.steps
+        ],
+    )
 
 
 @router.put("/{playlist_id}/order", status_code=status.HTTP_204_NO_CONTENT)

@@ -22,6 +22,7 @@ from app.services.explore import ExploreSync
 from app.services.playlist_editor import PlaylistEditor
 from app.services.playlist_export import PlaylistExporter
 from app.services.playlist_import import PlaylistImporter
+from app.services.playlist_reorder import PlaylistReorderer
 from app.services.preview import PreviewService
 from app.services.sessions import SessionService
 from app.services.spotify_connection import SpotifyConnection
@@ -107,6 +108,11 @@ def get_playlist_importer(
 ) -> PlaylistImporter:
     """Fournit le service d'import de playlists Spotify."""
     return PlaylistImporter(db, provider, queue)
+
+
+def get_playlist_reorderer(db: Annotated[Database, Depends(get_db)]) -> PlaylistReorderer:
+    """Fournit le service qui propose un meilleur ordre pour une playlist."""
+    return PlaylistReorderer(db)
 
 
 def get_playlist_editor(db: Annotated[Database, Depends(get_db)]) -> PlaylistEditor:
