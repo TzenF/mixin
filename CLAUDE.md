@@ -333,7 +333,19 @@ V2, dans l'ordre (une étape à la fois, plan validé avant de coder) :
    du site. Livraison 3 (export Spotify des morceaux venus de Deezer, identifiant retrouvé par ISRC à l'export) :
    faite le 18/10/2026 ; vrai export pas encore vérifié. Un morceau introuvable est recherché à chaque export.
 
-Prochaines idées (à décider) : corrections globales (admin).
+Prochaines idées (proposées le 18/10/2026, dans l'ordre conseillé ; une à la fois, plan validé avant de coder) :
+1. **Morceau pont** : sur un enchaînement refusé A → B d'une playlist, proposer des morceaux C tels que A → C et
+   C → B sont compatibles (règle `transition`), puis l'insérer entre les deux.
+2. **Chemin entre deux morceaux** : de A à B en 3 à 6 morceaux compatibles (recherche dans le graphe des
+   enchaînements, limitée à « mes morceaux » pour rester rapide) ; généralise le pont.
+3. **Réordonner une playlist** : proposer l'ordre qui maximise le score des enchaînements (heuristique, 20 à
+   40 morceaux), avec aperçu avant / après, sans écraser. Limite : sans énergie, ne sait pas construire une montée.
+4. **Courbe de la playlist** : BPM morceau par morceau, enchaînements colorés selon leur qualité, parcours sur la
+   roue de Camelot. Front seulement.
+5. **Explorer « compatibles avec mes favoris »** : ne montrer que les morceaux qui s'enchaînent avec au moins un
+   favori. Coût à mesurer avant de promettre (environ 500 morceaux × favoris).
+
+Autres idées (à décider) : corrections globales (admin).
 
 Retirés (16/10/2026) : **import XML rekordbox** (l'autrice utilise rekordbox seulement comme destination, via
 Spotify) et donc **export M3U** (sans import rekordbox, aucun chemin de fichier audio : un M3U serait vide).
