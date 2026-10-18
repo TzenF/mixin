@@ -1,0 +1,52 @@
+@use 'mixins' as m;
+@use 'tokens' as t;
+
+:host {
+  display: block;
+  font-size: t.$font-size-sm;
+}
+
+.hint {
+  @include m.text-muted;
+}
+
+.error {
+  @include m.text-danger;
+}
+
+ul {
+  @include m.reset-list;
+}
+
+li {
+  display: flex;
+  align-items: center;
+  gap: t.$space-3;
+  padding: t.$space-2 0;
+  border-top: t.$border-width solid var(--color-border);
+}
+
+.what {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: t.$space-1;
+}
+
+.where {
+  font-weight: t.$font-weight-bold;
+}
+
+.side {
+  @include m.text-muted;
+
+  &.warn {
+    @include m.text-danger;
+  }
+}
+
+.badge.repairs {
+  @include m.badge;
+  @include m.status(success);
+  margin-left: t.$space-2;
+}

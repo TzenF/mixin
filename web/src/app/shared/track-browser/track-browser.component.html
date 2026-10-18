@@ -239,10 +239,28 @@
                   Suggestions
                 </button>
                 <app-add-to-playlist [trackId]="track.id" />
+                @if (track.fit_count && currentPlaylist.current()) {
+                  <button
+                    type="button"
+                    class="secondary"
+                    [attr.aria-expanded]="placing() === track.id"
+                    (click)="togglePlacing(track)"
+                    data-testid="open-placements"
+                  >
+                    Où le placer ?
+                  </button>
+                }
                 <app-track-correction [track]="track" (corrected)="onCorrected($event)" />
               </span>
             </td>
           </tr>
+          @if (placing() === track.id) {
+            <tr class="placing" data-testid="placements-row">
+              <td [attr.colspan]="mode() === 'explore' ? 8 : 7">
+                <app-placement-finder [trackId]="track.id" (inserted)="onPlaced()" />
+              </td>
+            </tr>
+          }
         }
       </tbody>
     </table>

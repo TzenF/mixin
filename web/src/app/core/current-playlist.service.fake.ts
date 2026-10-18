@@ -22,6 +22,8 @@ export class FakeCurrentPlaylistService {
   private readonly selectedId = signal<string | null>(null);
   /** Morceaux ajoutés, dans l'ordre (à vérifier dans les tests). */
   readonly added: string[] = [];
+  /** Position demandée pour chaque ajout (undefined : en fin). */
+  readonly positions: (number | undefined)[] = [];
   /** Nombre d'appels à refresh(). */
   refreshCount = 0;
 
@@ -48,9 +50,10 @@ export class FakeCurrentPlaylistService {
     return of(created);
   }
 
-  /** Ajoute un morceau (sans requête). */
-  add(trackId: string): Observable<AddedItem> {
+  /** Ajoute un morceau (sans requête), en fin ou à `position`. */
+  add(trackId: string, position?: number): Observable<AddedItem> {
     this.added.push(trackId);
+    this.positions.push(position);
     this.trackIds.update((ids) => new Set(ids).add(trackId));
     return of({ item_id: this.added.length, position: this.added.length - 1 });
   }

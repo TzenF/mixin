@@ -1,0 +1,40 @@
+@switch (state().kind) {
+  @case ('loading') {
+    <p class="hint">Recherche des places…</p>
+  }
+  @case ('error') {
+    <p class="error" data-testid="placement-error">{{ errorMessage() }}</p>
+  }
+  @case ('ready') {
+    @if (rows().length === 0) {
+      <p class="hint" data-testid="no-placement">
+        Aucune place où il s'enchaîne d'un côté ou de l'autre.
+      </p>
+    }
+    <ul>
+      @for (row of rows(); track row.placement.position) {
+        <li data-testid="placement">
+          <span class="what">
+            <span class="where">
+              {{ row.where }}
+              @if (row.placement.repairs) {
+                <span class="badge repairs" data-testid="repairs">répare un ⚠</span>
+              }
+            </span>
+            @for (s of row.sides; track $index) {
+              <span class="side" [class.warn]="!s.ok">{{ s.text }}</span>
+            }
+          </span>
+          <button
+            type="button"
+            [disabled]="inserting()"
+            (click)="insert(row.placement)"
+            data-testid="insert-placement"
+          >
+            Insérer ici
+          </button>
+        </li>
+      }
+    </ul>
+  }
+}

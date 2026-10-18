@@ -65,13 +65,13 @@ export class CurrentPlaylistService {
     );
   }
 
-  /** Ajoute un morceau à la playlist en cours. */
-  add(trackId: string): Observable<AddedItem> {
+  /** Ajoute un morceau à la playlist en cours : en fin, ou à `position` (0 = en tête). */
+  add(trackId: string, position?: number): Observable<AddedItem> {
     const current = this.current();
     if (current === null) {
       return throwError(() => new Error('Aucune playlist en cours'));
     }
-    return this.playlists.addTrack(current.id, trackId).pipe(
+    return this.playlists.addTrack(current.id, trackId, position).pipe(
       tap(() => {
         this.trackIds.update((ids) => new Set(ids).add(trackId));
         this.editable.update(

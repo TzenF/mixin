@@ -25,6 +25,7 @@ import {
 } from '../../core/api/catalog.service';
 import { CurrentPlaylistService } from '../../core/current-playlist.service';
 import { AddToPlaylistComponent } from '../add-to-playlist/add-to-playlist.component';
+import { PlacementFinderComponent } from '../placement-finder/placement-finder.component';
 import { TrackCorrectionComponent } from '../track-correction/track-correction.component';
 import { PlayButtonComponent } from '../play-button/play-button.component';
 import { FavoriteButtonComponent } from '../favorite-button/favorite-button.component';
@@ -71,6 +72,7 @@ type State =
     FavoriteButtonComponent,
     TrackCorrectionComponent,
     PlayButtonComponent,
+    PlacementFinderComponent,
   ],
   templateUrl: './track-browser.component.html',
   styleUrl: './track-browser.component.scss',
@@ -99,6 +101,8 @@ export class TrackBrowserComponent implements OnInit {
   protected readonly state = signal<State>({ kind: 'loading' });
   /** Morceau dont la tonalité est en cours d'inversion, ou null. */
   protected readonly flipping = signal<string | null>(null);
+  /** Morceau dont on cherche la place dans la playlist en cours, ou null. */
+  protected readonly placing = signal<string | null>(null);
   /** Échec de la dernière correction de tonalité, ou null. */
   protected readonly correctionError = signal<string | null>(null);
 
@@ -193,6 +197,17 @@ export class TrackBrowserComponent implements OnInit {
   /** N'affiche que les morceaux qui s'enchaînent avec la playlist en cours (ou tout). */
   protected setFitsOnly(fitsOnly: boolean): void {
     this.applyFilters({ fitsOnly });
+  }
+
+  /** Ouvre (ou referme) « Où le placer ? » pour ce morceau. */
+  protected togglePlacing(track: CatalogTrack): void {
+    this.placing.update((id) => (id === track.id ? null : track.id));
+  }
+
+  /** Après l'insertion : les liens avec la playlist en cours ont changé, la page est rechargée. */
+  protected onPlaced(): void {
+    this.placing.set(null);
+    this.load();
   }
 
   /** Bascule entre mes morceaux et tous les morceaux de la base. */

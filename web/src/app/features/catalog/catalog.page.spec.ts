@@ -275,6 +275,25 @@ describe('CatalogPage', () => {
     );
   });
 
+  it('« Où le placer ? » ouvre les places du morceau sous sa ligne', async () => {
+    setup();
+    currentPlaylist.select('current');
+    const fixture = TestBed.createComponent(CatalogPage);
+    fixture.detectChanges();
+    pending().flush({ total: 2, items: [{ ...ALPHA, fit_count: 2 }, PENDING] });
+    await fixture.whenStable();
+
+    const buttons = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
+      '[data-testid="open-placements"]',
+    );
+    expect(buttons.length).toBe(1); // seulement sur le morceau qui s'enchaîne avec la playlist
+    buttons[0].click();
+    fixture.detectChanges();
+
+    expect(byTestId(fixture, 'placements-row')).not.toBeNull();
+    http.expectOne((r) => r.url === '/api/tracks/a/placements').flush([]);
+  });
+
   it('recompte quand la playlist en cours change', async () => {
     setup();
     const fixture = await render();

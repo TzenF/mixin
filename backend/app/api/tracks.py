@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 
 from app.adapters.db import Database
-from app.adapters.playlist_repository import PlaylistRepository
+from app.adapters.playlist_repository import PlaylistItemRow, PlaylistRepository
 from app.adapters.queue import TaskQueue
 from app.adapters.track_repository import CatalogFilters, CatalogSort, TrackRepository
 from app.api.deps import (
@@ -22,6 +22,7 @@ from app.api.deps import (
 )
 from app.api.transitions import RatingOut, Transition
 from app.domain.camelot import CamelotKey
+from app.services.placement import PlacementFinder
 from app.services.preview import PreviewService
 from app.services.set_path import PathFinder
 from app.services.track_correction import (
@@ -169,6 +170,30 @@ class SetPathOut(BaseModel):
     score: float
 
 
+class Neighbour(BaseModel):
+    """Un morceau voisin d'une place : sa place dans la playlist (1, 2…) et son titre."""
+
+    place: int
+    title: str
+
+
+class PlacementOut(BaseModel):
+    """Une place où insérer le morceau ; incoming / outgoing null = refusé (ou absent en bout de playlist)."""
+
+    position: int
+    before: Neighbour | None
+    after: Neighbour | None
+    incoming: Transition | None
+    outgoing: Transition | None
+    repairs: bool
+    score: float
+
+
+def _neighbour(item: PlaylistItemRow | None) -> Neighbour | None:
+    """Voisin d'une place tel qu'affiché (place à partir de 1), ou None en ouverture / en fin."""
+    return Neighbour(place=item.position + 1, title=item.track.title) if item else None
+
+
 async def _ensure_exists(tracks: TrackRepository, track_id: UUID) -> None:
     """Lève une erreur 404 si le morceau n'existe pas."""
     if not await tracks.exists(track_id):
@@ -246,6 +271,29 @@ async def paths(
                 SetPathStep(transition=Transition(**asdict(s.transition)), score=s.score)
                 for s in p.transitions
             ],
+            score=p.score,
+        )
+        for p in found
+    ]
+
+
+@router.get("/{track_id}/placements")
+async def placements(
+    track_id: UUID,
+    playlist: UUID,
+    db: Annotated[Database, Depends(get_db)],
+    user_id: CurrentUser,
+) -> list[PlacementOut]:
+    """Où insérer ce morceau dans ma playlist (au plus 5 places) ; 404 si pas à moi, 409 si importée."""
+    found = await PlacementFinder(db).placements(user_id, playlist, track_id, DEFAULT_BPM_TOLERANCE)
+    return [
+        PlacementOut(
+            position=p.position,
+            before=_neighbour(p.before),
+            after=_neighbour(p.after),
+            incoming=Transition(**asdict(p.incoming.transition)) if p.incoming else None,
+            outgoing=Transition(**asdict(p.outgoing.transition)) if p.outgoing else None,
+            repairs=p.repairs,
             score=p.score,
         )
         for p in found

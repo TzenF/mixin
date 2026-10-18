@@ -302,6 +302,33 @@ def test_catalog_counts_links_with_a_playlist(
     assert logged_in_client.get("/tracks", params={"fits_only": True}).status_code == 422
 
 
+def test_placements_in_a_playlist(
+    logged_in_client: TestClient, playlists: dict[str, str], test_prefix: str
+) -> None:
+    # Set = A (124, 6A), B (125, 7A), C (135, 7A : refusé après B, tempo), D (pas analysé), E (124, 12A)
+    tid = uuid.uuid4()
+    with psycopg.connect(get_settings().database_url, autocommit=True) as conn:
+        conn.execute("INSERT INTO track (id, title) VALUES (%s, %s)", (tid, f"{test_prefix} Y"))
+        conn.execute(
+            """INSERT INTO track_analysis (track_id, source, bpm, camelot_num, camelot_letter, key_confidence)
+               VALUES (%s, 'essentia', 130, 7, 'A', 0.9)""",
+            (tid,),
+        )
+
+    resp = logged_in_client.get(f"/tracks/{tid}/placements", params={"playlist": playlists["mine"]})
+    assert resp.status_code == 200
+    first = resp.json()[0]
+    # Y (130, 7A) fait le pont entre B et C : la meilleure place, qui répare le ⚠
+    assert (first["position"], first["repairs"]) == (2, True)
+    assert (first["before"]["place"], first["after"]["place"]) == (2, 3)
+    assert first["incoming"]["compatible"] and first["outgoing"]["compatible"]
+
+    other = logged_in_client.get(f"/tracks/{tid}/placements", params={"playlist": playlists["other"]})
+    assert other.status_code == 404
+    imported = logged_in_client.get(f"/tracks/{tid}/placements", params={"playlist": playlists["imported"]})
+    assert imported.status_code == 409
+
+
 def test_imported_playlists_are_read_only(
     logged_in_client: TestClient, playlists: dict[str, str], test_prefix: str
 ) -> None:

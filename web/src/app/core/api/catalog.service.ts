@@ -68,6 +68,23 @@ export interface SetPath {
   score: number;
 }
 
+/** Une place où insérer un morceau dans ma playlist (voir backend/app/api/tracks.py). */
+export interface Placement {
+  /** Position d'insertion (0 = en tête). */
+  position: number;
+  /** Morceau juste avant (place à partir de 1), ou null en ouverture. */
+  before: { place: number; title: string } | null;
+  /** Morceau juste après, ou null en fin. */
+  after: { place: number; title: string } | null;
+  /** Avant → ce morceau ; null : refusé (ou rien avant). */
+  incoming: Transition | null;
+  /** Ce morceau → après ; null : refusé (ou rien après). */
+  outgoing: Transition | null;
+  /** L'enchaînement avant → après était refusé, et ce morceau le répare. */
+  repairs: boolean;
+  score: number;
+}
+
 /** Ma note d'un enchaînement A → B (1 à 5) et mon commentaire éventuel. */
 export interface TransitionRating {
   rating: number;
@@ -220,6 +237,13 @@ export class CatalogService {
       `/api/tracks/${encodeURIComponent(fromId)}/paths/${encodeURIComponent(toId)}`,
       { params: new HttpParams().set('scope', scope) },
     );
+  }
+
+  /** Les meilleures places pour ce morceau dans ma playlist (au plus 5). */
+  placements(trackId: string, playlistId: string): Observable<Placement[]> {
+    return this.http.get<Placement[]>(`/api/tracks/${encodeURIComponent(trackId)}/placements`, {
+      params: new HttpParams().set('playlist', playlistId),
+    });
   }
 
   /** Met le morceau dans mes favoris, ou l'en retire. */
