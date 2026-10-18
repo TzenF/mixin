@@ -5,16 +5,7 @@
   display: block;
 }
 
-figure {
-  @include m.panel;
-  margin: 0;
-  border: t.$border-width solid var(--color-border);
-}
-
-figcaption {
-  margin-bottom: t.$space-2;
-  font-weight: t.$font-weight-bold;
-}
+@include m.chart-figure;
 
 .plot {
   position: relative;
@@ -93,17 +84,9 @@ svg {
 }
 
 .tooltip {
-  @include m.panel;
-  position: absolute;
-  display: flex;
-  flex-direction: column;
-  gap: t.$space-1;
-  max-width: t.$width-tooltip;
+  @include m.chart-tooltip;
   margin-top: t.$space-4;
-  border: t.$border-width solid var(--color-border);
-  font-size: t.$font-size-sm;
   transform: translateX(-50%);
-  pointer-events: none;
 }
 
 .legend {

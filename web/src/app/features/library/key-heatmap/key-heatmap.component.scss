@@ -1,0 +1,99 @@
+@use 'mixins' as m;
+@use 'tokens' as t;
+
+:host {
+  display: block;
+}
+
+@include m.chart-figure;
+
+.plot {
+  position: relative;
+}
+
+svg {
+  display: block;
+  overflow: visible;
+  @include m.focus-ring;
+}
+
+.ring {
+  fill: none;
+  stroke: var(--color-border);
+  stroke-width: t.$chart-hairline;
+}
+
+.key {
+  cursor: pointer;
+}
+
+// Palier 0 (aucun morceau) : case vide, juste cerclée ; paliers 1 à 5 : du clair au foncé.
+.cell,
+.swatch {
+  @include m.heat-step(fill);
+}
+
+.cell {
+  stroke: var(--color-surface);
+  stroke-width: t.$chart-ring-width;
+
+  &.step-0 {
+    stroke: var(--color-border);
+    stroke-width: t.$chart-hairline;
+  }
+}
+
+.active .cell {
+  stroke: var(--color-text);
+}
+
+.name {
+  fill: var(--color-primary-contrast);
+  font-size: t.$font-size-xs;
+  font-weight: t.$font-weight-bold;
+  pointer-events: none;
+
+  &.dark {
+    fill: var(--color-text);
+  }
+}
+
+.tooltip {
+  @include m.chart-tooltip;
+  margin-top: t.$space-6;
+  transform: translateX(-50%);
+}
+
+.legend {
+  @include m.text-muted;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: t.$space-2;
+  font-size: t.$font-size-sm;
+}
+
+.swatch {
+  @include m.heat-step(background);
+  display: inline-block;
+  width: t.$space-3;
+  height: t.$space-3;
+  border-radius: t.$radius-sm;
+
+  &.step-0 {
+    border: t.$border-width solid var(--color-border);
+  }
+}
+
+.poorest {
+  font-size: t.$font-size-sm;
+}
+
+table {
+  font-size: t.$font-size-sm;
+}
+
+.number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

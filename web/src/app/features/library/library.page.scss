@@ -1,0 +1,19 @@
+@use 'mixins' as m;
+@use 'tokens' as t;
+
+main {
+  @include m.page;
+}
+
+.hint {
+  @include m.text-muted;
+}
+
+.error {
+  @include m.text-danger;
+}
+
+// La roue à gauche, l'histogramme prend le reste ; l'un sous l'autre sur téléphone.
+.charts {
+  @include m.chart-row;
+}

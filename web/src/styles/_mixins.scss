@@ -280,6 +280,60 @@
   }
 }
 
+/// Rangée de graphiques : côte à côte sur grand écran, l'un sous l'autre sur téléphone ; `.grow` prend le reste.
+@mixin chart-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: t.$space-4;
+
+  .grow {
+    flex: 1 1 t.$width-narrow;
+    min-width: 0;
+  }
+}
+
+/// Cadre d'un graphique (`figure` + `figcaption`) : carte encadrée, titre en gras.
+@mixin chart-figure {
+  figure {
+    @include panel;
+    margin: 0;
+    border: t.$border-width solid var(--color-border);
+  }
+
+  figcaption {
+    margin-bottom: t.$space-2;
+    font-weight: t.$font-weight-bold;
+  }
+}
+
+/// Infobulle d'un graphique, placée en position absolue dans son conteneur (`position: relative`).
+@mixin chart-tooltip {
+  @include panel;
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-1;
+  max-width: t.$width-tooltip;
+  border: t.$border-width solid var(--color-border);
+  font-size: t.$font-size-sm;
+  pointer-events: none;
+}
+
+/// Palier d'une carte de chaleur : `.step-0` (vide, couleur du fond) puis `.step-1` à `.step-5` (clair → foncé).
+/// @param $property propriété colorée : fill (SVG) ou background (légende)
+@mixin heat-step($property) {
+  &.step-0 {
+    #{$property}: var(--color-surface);
+  }
+
+  @for $i from 1 through 5 {
+    &.step-#{$i} {
+      #{$property}: var(--color-seq-#{$i});
+    }
+  }
+}
+
 /// Texte d'un enchaînement selon son état (classes de `describeTransition`) : `.ok` et `.unknown` discrets,
 /// `.warn` en rouge.
 @mixin transition-kinds {

@@ -1,5 +1,6 @@
 import { Component, computed, input, signal } from '@angular/core';
 import { PlaylistItem } from '../../../core/api/playlist.service';
+import { CAMELOT_KEYS, Ring, ringOf, wheelPoint } from '../../../shared/camelot-geometry';
 
 /** Taille de la roue (px, carré) et rayons des deux anneaux : B (majeur) dehors, A (mineur) dedans. */
 const SIZE = 300;
@@ -17,8 +18,6 @@ const END_RING_RADIUS = NODE_RADIUS + 4;
 const WARNING_RADIUS = 8;
 /** Au-delà, le parcours devient une pelote : seules les tonalités jouées restent. */
 const MAX_PATH_ITEMS = 100;
-
-type Ring = 'A' | 'B';
 
 /** Une tonalité de la roue, jouée ou non. */
 interface WheelKey {
@@ -45,18 +44,9 @@ interface WheelMove {
   width: number;
 }
 
-/** Les 24 tonalités dans l'ordre de la roue : 1A, 1B, 2A… 12B. */
-const KEYS = Array.from({ length: 12 }, (_, i) => [`${i + 1}A`, `${i + 1}B`]).flat();
-
-/** Anneau d'une tonalité Camelot (B = majeur, A = mineur). */
-function ringOf(key: string): Ring {
-  return key.endsWith('B') ? 'B' : 'A';
-}
-
-/** Point de la roue au numéro `number` (le 1 en haut, sens des aiguilles d'une montre) et au rayon `r`. */
+/** Point de la roue au numéro `number` et au rayon `r`. */
 function at(number: number, r: number): { x: number; y: number } {
-  const angle = ((number - 1) * 30 - 90) * (Math.PI / 180);
-  return { x: CENTER + r * Math.cos(angle), y: CENTER + r * Math.sin(angle) };
+  return wheelPoint(number, r, CENTER);
 }
 
 /** Position d'une tonalité sur son anneau. */
@@ -126,7 +116,7 @@ export class CamelotWheelComponent {
       }
     });
     const { first, last } = this.ends();
-    return KEYS.map((key) => {
+    return CAMELOT_KEYS.map((key) => {
       const ring = ringOf(key);
       const tag =
         key === first && key === last

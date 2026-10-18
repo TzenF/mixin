@@ -1,0 +1,69 @@
+<figure data-testid="bpm-histogram">
+  <figcaption>Mes morceaux par BPM (tranches de 2)</figcaption>
+  <div class="bars">
+    @for (bin of bins(); track bin.from) {
+      <a
+        class="bin"
+        routerLink="/catalog"
+        [queryParams]="bin.query"
+        [title]="
+          bin.from +
+          '–' +
+          (bin.from + 2) +
+          ' BPM : ' +
+          bin.count +
+          ' morceau' +
+          (bin.count > 1 ? 'x' : '')
+        "
+        [attr.aria-label]="
+          bin.from + ' à ' + (bin.from + 2) + ' BPM : ' + bin.count + ' morceaux, chercher'
+        "
+        data-testid="bpm-bin"
+      >
+        @if (bin.count > 0) {
+          <span class="bar" [style.height.%]="bin.height"></span>
+        } @else {
+          <span class="hole" data-testid="bpm-hole"></span>
+        }
+      </a>
+    }
+  </div>
+  <div class="axis" aria-hidden="true">
+    @for (bin of bins(); track bin.from) {
+      <span class="tick">{{ ticks().includes(bin.from) ? bin.from : '' }}</span>
+    }
+  </div>
+
+  @if (gaps().length > 0) {
+    <p class="gaps" data-testid="bpm-gaps">
+      Aucun morceau :
+      @for (gap of gaps(); track gap.from; let last = $last) {
+        <a routerLink="/catalog" [queryParams]="gap.query" data-testid="bpm-gap"
+          >{{ gap.from }}–{{ gap.to }} BPM</a
+        >{{ last ? '' : ',' }}
+      }
+    </p>
+  } @else {
+    <p class="gaps hint">Aucune plage vide entre 90 et 160 BPM.</p>
+  }
+
+  <details>
+    <summary>Tableau des BPM</summary>
+    <table data-testid="bpm-table">
+      <thead>
+        <tr>
+          <th scope="col">BPM</th>
+          <th scope="col" class="number">Morceaux</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (bin of bins(); track bin.from) {
+          <tr>
+            <td>{{ bin.from }}–{{ bin.from + 2 }}</td>
+            <td class="number">{{ bin.count }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </details>
+</figure>

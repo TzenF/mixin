@@ -73,16 +73,8 @@ ol {
 
 // Courbe et roue côte à côte sur grand écran, l'une sous l'autre sur téléphone.
 .charts {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: t.$space-4;
+  @include m.chart-row;
   margin-bottom: t.$space-4;
-}
-
-.curve {
-  flex: 1 1 t.$width-narrow;
-  min-width: 0;
 }
 
 .rename {

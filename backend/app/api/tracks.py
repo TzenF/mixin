@@ -123,6 +123,21 @@ async def catalog(
     return Catalog(total=page.total, items=[CatalogTrack(**asdict(r)) for r in page.items])
 
 
+class LibraryMapOut(BaseModel):
+    """Mes morceaux comptés par tonalité (« 8A ») et par tranche de 2 BPM (124 = de 124 à moins de 126)."""
+
+    tracks: int
+    keys: dict[str, int]
+    bpm_bins: dict[int, int]
+
+
+@router.get("/library-map")
+async def library_map(tracks: Tracks, user_id: CurrentUser) -> LibraryMapOut:
+    """Carte de ma bibliothèque : où j'ai beaucoup de morceaux, et où il m'en manque."""
+    m = await tracks.library_map(user_id)
+    return LibraryMapOut(tracks=m.tracks, keys=m.keys, bpm_bins=m.bpm_bins)
+
+
 class Suggestion(BaseModel):
     """Un morceau compatible avec le morceau de départ, et pourquoi."""
 

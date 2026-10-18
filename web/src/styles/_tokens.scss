@@ -52,6 +52,8 @@ $control-height-sm: 1.75rem; // petits boutons dans une ligne (▶, ★, ⇄, no
 $chart-stroke-width: 2px; // courbes
 $chart-hairline: 1px; // quadrillage, axes, ligne de survol
 $chart-ring-width: 2px; // anneau couleur du fond autour des points
+$chart-height: 10rem; // hauteur de la zone des barres d'un histogramme
+$chart-bar-max-width: 24px; // une barre ne remplit jamais toute sa place (méthode dataviz)
 
 // --- Ombre des cartes ---
 $shadow-card:
@@ -81,4 +83,11 @@ $shadow-card:
   --color-danger-bg: #fde8e8;
   --color-danger-text: #b42318;
   --color-focus: #1f5fbf;
+  // Gamme du clair au foncé (une seule teinte) pour les cartes de chaleur ; vérifiée au validateur dataviz
+  // (luminosité croissante, écarts visibles, extrémité claire ≥ 2:1 sur blanc). Texte marine sur 1-2, blanc sur 3-5.
+  --color-seq-1: #8db3e8;
+  --color-seq-2: #6496dd;
+  --color-seq-3: #3f7ccf;
+  --color-seq-4: #2a62b3;
+  --color-seq-5: #1b4789;
 }

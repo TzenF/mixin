@@ -15,6 +15,7 @@ export const NAV_LINKS: readonly NavLink[] = [
   { path: '/catalog', label: 'Catalogue' },
   { path: '/explore', label: 'Explorer' },
   { path: '/playlists', label: 'Playlists' },
+  { path: '/library', label: 'Bibliothèque' },
   { path: '/spotify', label: 'Spotify' },
   { path: '/status', label: 'État' },
 ];

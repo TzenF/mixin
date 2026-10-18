@@ -1,0 +1,97 @@
+<figure data-testid="key-heatmap">
+  <figcaption>Mes morceaux par tonalité</figcaption>
+  <div class="plot">
+    <svg
+      [attr.width]="size"
+      [attr.height]="size"
+      [attr.viewBox]="'0 0 ' + size + ' ' + size"
+      role="img"
+      aria-label="Roue de Camelot : nombre de mes morceaux dans chaque tonalité (détail dans le tableau)"
+      tabindex="0"
+      (focus)="active() === null && active.set('1A')"
+      (blur)="active.set(null)"
+      (keydown)="onKeydown($event)"
+      (pointerleave)="active.set(null)"
+      data-testid="key-heatmap-svg"
+    >
+      <circle class="ring" [attr.cx]="center" [attr.cy]="center" [attr.r]="radius.B" />
+      <circle class="ring" [attr.cx]="center" [attr.cy]="center" [attr.r]="radius.A" />
+      @for (k of keys(); track k.key) {
+        <g
+          class="key"
+          [class.active]="active() === k.key"
+          (pointerenter)="active.set(k.key)"
+          (click)="search(k.key)"
+          data-testid="heat-key"
+        >
+          <circle
+            [attr.class]="'cell step-' + k.step"
+            [attr.cx]="k.x"
+            [attr.cy]="k.y"
+            [attr.r]="nodeRadius"
+          />
+          <text
+            class="name"
+            [class.dark]="darkText(k)"
+            [attr.x]="k.x"
+            [attr.y]="k.y"
+            text-anchor="middle"
+            dy="0.35em"
+          >
+            {{ k.key }}
+          </text>
+        </g>
+      }
+    </svg>
+
+    @if (tooltip(); as t) {
+      <div
+        class="tooltip"
+        [style.left.px]="t.x"
+        [style.top.px]="t.y"
+        role="status"
+        data-testid="heat-tooltip"
+      >
+        <strong>{{ t.count }} morceau{{ t.count > 1 ? 'x' : '' }}</strong>
+        <span>en {{ t.key }} · clic : chercher d'autres morceaux</span>
+      </div>
+    }
+  </div>
+
+  <p class="legend">
+    @for (l of legend(); track l.step) {
+      <span class="swatch" [class]="'swatch step-' + l.step"></span>
+      {{ l.from === l.to ? l.from : l.from + '–' + l.to }}
+    }
+    <span class="swatch step-0"></span> aucun
+  </p>
+
+  <p class="poorest" data-testid="poorest">
+    Le moins fournies :
+    @for (k of poorest(); track k.key; let last = $last) {
+      <a routerLink="/catalog" [queryParams]="{ scope: 'all', key: k.key }" data-testid="poor-key"
+        >{{ k.key }} ({{ k.count }})</a
+      >{{ last ? '' : ',' }}
+    }
+  </p>
+
+  <details>
+    <summary>Tableau des tonalités</summary>
+    <table data-testid="key-table">
+      <thead>
+        <tr>
+          <th scope="col">Tonalité</th>
+          <th scope="col" class="number">Morceaux</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (k of keys(); track k.key) {
+          <tr>
+            <td>{{ k.key }}</td>
+            <td class="number">{{ k.count }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </details>
+</figure>

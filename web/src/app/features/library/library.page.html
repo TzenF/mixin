@@ -1,0 +1,30 @@
+<main>
+  <h1>Ma bibliothèque</h1>
+  <p class="hint">
+    Où sont tes morceaux (ceux de tes playlists et tes favoris), par tonalité et par BPM. Un clic
+    sur une tonalité ou une tranche ouvre le catalogue filtré dessus, avec les morceaux de
+    l'Explorer que tu n'as pas encore.
+  </p>
+
+  @switch (state().kind) {
+    @case ('loading') {
+      <p class="hint" data-testid="loading">Chargement…</p>
+    }
+    @case ('disconnected') {
+      <p class="hint">Connecte-toi avec Spotify pour voir ta bibliothèque.</p>
+      <a class="button accent" [href]="loginUrl" data-testid="connect-spotify">Connecter Spotify</a>
+    }
+    @case ('error') {
+      <p class="error" data-testid="error">{{ errorMessage() }}</p>
+      <button type="button" (click)="load()">Réessayer</button>
+    }
+  }
+
+  @if (map(); as m) {
+    <p class="hint" data-testid="library-total">{{ m.tracks }} morceaux</p>
+    <div class="charts">
+      <app-key-heatmap [counts]="m.keys" />
+      <app-bpm-histogram class="grow" [counts]="m.bpm_bins" />
+    </div>
+  }
+</main>

@@ -34,6 +34,11 @@ export const routes: Routes = [
     title: 'Explorer · DJ Platform',
   },
   {
+    path: 'library',
+    loadComponent: () => import('./features/library/library.page').then((m) => m.LibraryPage),
+    title: 'Ma bibliothèque · DJ Platform',
+  },
+  {
     path: 'playlists',
     loadComponent: () => import('./features/playlists/playlists.page').then((m) => m.PlaylistsPage),
     title: 'Playlists · DJ Platform',

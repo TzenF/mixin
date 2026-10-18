@@ -87,6 +87,13 @@ export interface Placement {
   score: number;
 }
 
+/** Mes morceaux comptés par tonalité (« 8A ») et par tranche de 2 BPM (« 124 » = 124 à moins de 126). */
+export interface LibraryMap {
+  tracks: number;
+  keys: Record<string, number>;
+  bpm_bins: Record<string, number>;
+}
+
 /** Ma note d'un enchaînement A → B (1 à 5) et mon commentaire éventuel. */
 export interface TransitionRating {
   rating: number;
@@ -246,6 +253,11 @@ export class CatalogService {
     return this.http.get<Placement[]>(`/api/tracks/${encodeURIComponent(trackId)}/placements`, {
       params: new HttpParams().set('playlist', playlistId),
     });
+  }
+
+  /** Carte de ma bibliothèque : mes morceaux par tonalité et par tranche de BPM. */
+  libraryMap(): Observable<LibraryMap> {
+    return this.http.get<LibraryMap>('/api/tracks/library-map');
   }
 
   /** Met le morceau dans mes favoris, ou l'en retire. */

@@ -95,6 +95,15 @@ class ScoredTransition:
 
 
 @dataclass(frozen=True, slots=True)
+class LibraryMap:
+    """Ma bibliothèque en chiffres : morceaux par tonalité (« 8A » : n) et par tranche de 2 BPM (124 : n)."""
+
+    tracks: int  # mes morceaux (playlists et favoris)
+    keys: dict[str, int]
+    bpm_bins: dict[int, int]
+
+
+@dataclass(frozen=True, slots=True)
 class CatalogPage:
     """Une page du catalogue et le nombre total de morceaux qui passent les filtres."""
 
@@ -384,6 +393,29 @@ class TrackRepository:
             {"user_id": user_id, "ids": track_ids},
         )
         return {r["id"]: CatalogRow(**r) for r in rows}
+
+    async def library_map(self, user_id: UUID) -> LibraryMap:
+        """Mes morceaux comptés par tonalité et par tranche de 2 BPM (mes valeurs, corrections comprises)."""
+        params = {"user_id": user_id, "only_mine": True}
+        mine = f"""FROM track t JOIN effective_features(%(user_id)s::uuid) f ON f.track_id = t.id
+                   WHERE {_MINE_SQL}"""
+        total = await self._db.fetch_one(f"SELECT count(*) AS n FROM track t WHERE {_MINE_SQL}", params)
+        keys = await self._db.fetch_all(
+            f"""SELECT f.camelot_num || f.camelot_letter AS key, count(*)::integer AS n {mine}
+                AND f.camelot_num IS NOT NULL GROUP BY 1""",
+            params,
+        )
+        bins = await self._db.fetch_all(
+            f"""SELECT (floor(f.bpm / 2) * 2)::integer AS bin, count(*)::integer AS n {mine}
+                AND f.bpm IS NOT NULL GROUP BY 1""",
+            params,
+        )
+        assert total is not None
+        return LibraryMap(
+            tracks=total["n"],
+            keys={r["key"]: r["n"] for r in keys},
+            bpm_bins={r["bin"]: r["n"] for r in bins},
+        )
 
     async def set_favorite(self, user_id: UUID, track_id: UUID, favorite: bool) -> None:
         """Marque ou démarque le morceau comme favori de l'utilisateur (sans effet s'il l'est déjà)."""

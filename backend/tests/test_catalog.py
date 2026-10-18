@@ -321,3 +321,28 @@ def test_correction_validation(logged_in_client: TestClient, catalog: str) -> No
 
 def test_corrections_require_a_session(client: TestClient) -> None:
     assert client.patch(f"/tracks/{uuid.uuid4()}/correction", json={"bpm": 120}).status_code == 401
+
+
+def test_library_map_counts_my_tracks_by_key_and_bpm(
+    logged_in_client: TestClient, user_id: uuid.UUID, test_prefix: str
+) -> None:
+    # Utilisateur neuf : ses seuls morceaux sont ces trois favoris
+    with psycopg.connect(get_settings().database_url, autocommit=True) as conn:
+        for n, (bpm, num, letter) in enumerate([(124.0, 8, "A"), (125.9, 8, "A"), (140.2, 3, "B")]):
+            tid = uuid.uuid4()
+            conn.execute("INSERT INTO track (id, title) VALUES (%s, %s)", (tid, f"{test_prefix} {n}"))
+            conn.execute(
+                """INSERT INTO track_analysis
+                       (track_id, source, bpm, camelot_num, camelot_letter, key_confidence)
+                   VALUES (%s, 'essentia', %s, %s, %s, 0.9)""",
+                (tid, bpm, num, letter),
+            )
+            conn.execute("INSERT INTO favorite (user_id, track_id) VALUES (%s, %s)", (user_id, tid))
+
+    body = logged_in_client.get("/tracks/library-map").json()
+
+    assert body == {"tracks": 3, "keys": {"8A": 2, "3B": 1}, "bpm_bins": {"124": 2, "140": 1}}
+
+
+def test_library_map_requires_a_session(client: TestClient) -> None:
+    assert client.get("/tracks/library-map").status_code == 401

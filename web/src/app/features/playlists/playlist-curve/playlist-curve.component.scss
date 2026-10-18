@@ -5,16 +5,7 @@
   display: block;
 }
 
-figure {
-  @include m.panel;
-  margin: 0;
-  border: t.$border-width solid var(--color-border);
-}
-
-figcaption {
-  margin-bottom: t.$space-2;
-  font-weight: t.$font-weight-bold;
-}
+@include m.chart-figure;
 
 // Conteneur de l'infobulle (positionnée par rapport au graphique).
 .plot {
@@ -74,17 +65,9 @@ svg {
 }
 
 .tooltip {
-  @include m.panel;
-  position: absolute;
+  @include m.chart-tooltip;
   top: 0;
-  display: flex;
-  flex-direction: column;
-  gap: t.$space-1;
-  max-width: t.$width-tooltip;
   margin-left: t.$space-3;
-  border: t.$border-width solid var(--color-border);
-  font-size: t.$font-size-sm;
-  pointer-events: none;
 
   &.flip {
     transform: translateX(-100%);
