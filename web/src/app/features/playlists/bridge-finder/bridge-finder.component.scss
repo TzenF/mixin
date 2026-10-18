@@ -1,0 +1,50 @@
+@use 'mixins' as m;
+@use 'tokens' as t;
+
+// Sous l'enchaînement refusé, aligné sur son texte.
+:host {
+  display: block;
+  margin: 0 0 t.$space-2 t.$space-6;
+  font-size: t.$font-size-sm;
+}
+
+.panel {
+  @include m.panel;
+  margin-top: t.$space-2;
+  border: t.$border-width solid var(--color-border);
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: t.$space-2;
+}
+
+.hint {
+  @include m.text-muted;
+}
+
+.error {
+  @include m.text-danger;
+}
+
+ul {
+  @include m.reset-list;
+}
+
+.bridge {
+  display: flex;
+  align-items: center;
+  gap: t.$space-3;
+  padding: t.$space-2 0;
+}
+
+.what {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.title {
+  font-weight: t.$font-weight-bold;
+}

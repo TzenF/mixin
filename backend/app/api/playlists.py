@@ -6,7 +6,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from pydantic import BaseModel, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints
 
 from app.adapters.playlist_repository import PlaylistRepository
 from app.adapters.spotify_provider import SpotifyProvider
@@ -19,7 +19,7 @@ from app.api.deps import (
     get_spotify_provider,
 )
 from app.api.tracks import DEFAULT_BPM_TOLERANCE, CatalogTrack
-from app.api.transitions import RatingOut
+from app.api.transitions import RatingOut, Transition
 from app.services.playlist_editor import PlaylistEditor
 from app.services.playlist_export import PlaylistExporter
 from app.services.spotify_connection import SpotifyConnection
@@ -42,19 +42,6 @@ class PlaylistSummary(BaseModel):
     source_provider: str | None
     track_count: int
     updated_at: datetime
-
-
-class Transition(BaseModel):
-    """Enchaînement vers le morceau suivant ; key_move null = tonalité incompatible (voir key_distance)."""
-
-    key_move: str | None
-    key_distance: int
-    half_double: bool
-    bpm_diff: float
-    bpm_change: float
-    tempo_ok: bool
-    same_mode: bool
-    compatible: bool
 
 
 class PlaylistItem(BaseModel):
@@ -120,9 +107,10 @@ class PlaylistNameIn(BaseModel):
 
 
 class TrackToAdd(BaseModel):
-    """Morceau à ajouter en fin de playlist."""
+    """Morceau à ajouter en fin de playlist, ou à `position` (0 = en tête ; au-delà de la fin = en fin)."""
 
     track_id: UUID
+    position: Annotated[int, Field(ge=0)] | None = None
 
 
 class AddedItem(BaseModel):
@@ -155,8 +143,8 @@ async def delete_playlist(playlist_id: UUID, editor: Editor, user_id: CurrentUse
 
 @router.post("/{playlist_id}/items", status_code=status.HTTP_201_CREATED)
 async def add_track(playlist_id: UUID, body: TrackToAdd, editor: Editor, user_id: CurrentUser) -> AddedItem:
-    """Ajoute un morceau en fin de playlist ; 409 si elle est importée, 404 si le morceau n'existe pas."""
-    item_id, position = await editor.add_track(user_id, playlist_id, body.track_id)
+    """Ajoute un morceau (en fin, ou à `position`) ; 409 si playlist importée, 404 si morceau inconnu."""
+    item_id, position = await editor.add_track(user_id, playlist_id, body.track_id, body.position)
     return AddedItem(item_id=item_id, position=position)
 
 

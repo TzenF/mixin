@@ -54,15 +54,19 @@ class PlaylistEditor:
         await owned_playlist(repo, owner_id, playlist_id)
         await repo.delete(playlist_id)
 
-    async def add_track(self, owner_id: UUID, playlist_id: UUID, track_id: UUID) -> tuple[int, int]:
-        """Ajoute un morceau en fin de playlist ; renvoie (identifiant de l'élément, position)."""
+    async def add_track(
+        self, owner_id: UUID, playlist_id: UUID, track_id: UUID, position: int | None = None
+    ) -> tuple[int, int]:
+        """Ajoute un morceau en fin, ou à `position` (les suivants descendent) ; renvoie (élément, place)."""
         async with self._db.transaction() as tx:
             repo = PlaylistRepository(tx)
             await editable_playlist(repo, owner_id, playlist_id)
             if not await TrackRepository(tx).exists(track_id):
                 raise TrackMissingError("Morceau inconnu")
             await repo.lock(playlist_id)
-            return await repo.append_item(playlist_id, track_id)
+            if position is None:
+                return await repo.append_item(playlist_id, track_id)
+            return await repo.insert_item(playlist_id, track_id, position)
 
     async def reorder(self, owner_id: UUID, playlist_id: UUID, item_ids: list[int]) -> None:
         """Remplace l'ordre des morceaux ; la liste doit contenir exactement les éléments actuels."""

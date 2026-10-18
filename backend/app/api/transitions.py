@@ -32,6 +32,19 @@ class RatingOut(BaseModel):
     comment: str | None
 
 
+class Transition(BaseModel):
+    """Enchaînement d'un morceau vers un autre ; key_move null = tonalité incompatible (voir key_distance)."""
+
+    key_move: str | None
+    key_distance: int
+    half_double: bool
+    bpm_diff: float
+    bpm_change: float
+    tempo_ok: bool
+    same_mode: bool
+    compatible: bool
+
+
 class RatingCount(BaseModel):
     """Nombre d'enchaînements que j'ai notés."""
 

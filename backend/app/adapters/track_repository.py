@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from app.adapters.db import Queryable
@@ -48,6 +48,38 @@ class CatalogRow:
     favorite: bool
     mine: bool  # dans une de mes playlists ou en favori
     rank: int | None = None  # place dans la source de l'Explorer (1 = premier), None hors source
+
+
+@dataclass(frozen=True, slots=True)
+class TransitionRow:
+    """Enchaînement d'un morceau vers le suivant (voir la fonction SQL transition)."""
+
+    key_move: str | None
+    key_distance: int
+    half_double: bool
+    bpm_diff: float
+    bpm_change: float
+    tempo_ok: bool  # écart de BPM dans la tolérance (le reste vient de la tonalité)
+    same_mode: bool  # même lettre Camelot (mineur/mineur ou majeur/majeur)
+    compatible: bool
+
+
+@dataclass(frozen=True, slots=True)
+class BridgeRow:
+    """Un morceau qui fait le pont entre A et B : les deux enchaînements passent (voir bridge_tracks)."""
+
+    track_id: UUID
+    title: str
+    artists: list[str]
+    bpm: float
+    camelot: str
+    score: float  # le plus faible des deux enchaînements
+    favorite: bool
+    mine: bool
+    incoming: TransitionRow  # A -> ce morceau
+    incoming_score: float
+    outgoing: TransitionRow  # ce morceau -> B
+    outgoing_score: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,6 +142,19 @@ ORDER BY s.score DESC, lower(t.title), t.id
 LIMIT %(limit)s
 """
 
+# bridge_tracks est appelée sans limite (NULL), comme suggest_tracks : « mes morceaux » avant la limite.
+_BRIDGE_SQL = f"""
+SELECT b.*, t.title, {_ARTISTS_SQL} AS artists, {_FAVORITE_SQL} AS favorite, {_IS_MINE_SQL} AS mine
+FROM bridge_tracks(%(user_id)s::uuid, %(from_id)s::uuid, %(to_id)s::uuid,
+                   %(tolerance)s::numeric, NULL::integer) b
+JOIN track t ON t.id = b.track_id
+WHERE {_MINE_SQL}
+ORDER BY b.score DESC, lower(t.title), t.id
+LIMIT %(limit)s
+"""
+
+# Enchaînements où la lettre Camelot ne change pas (les autres passent de mineur à majeur, ou l'inverse).
+_SAME_MODE_MOVES = {"same", "adjacent", "energy_shift"}
 
 # Morceaux filtrés, avec leurs valeurs affichées.
 _CATALOG_FROM = f"""
@@ -240,6 +285,45 @@ class TrackRepository:
         )
         return [SuggestionRow(**r) for r in rows]
 
+    async def bridges(
+        self,
+        from_id: UUID,
+        to_id: UUID,
+        user_id: UUID,
+        bpm_tolerance: float,
+        limit: int,
+        only_mine: bool = True,
+    ) -> list[BridgeRow]:
+        """Morceaux qui font le pont entre `from_id` et `to_id`, du meilleur au moins bon."""
+        rows = await self._db.fetch_all(
+            _BRIDGE_SQL,
+            {
+                "user_id": user_id,
+                "from_id": from_id,
+                "to_id": to_id,
+                "tolerance": bpm_tolerance,
+                "limit": limit,
+                "only_mine": only_mine,
+            },
+        )
+        return [
+            BridgeRow(
+                track_id=r["track_id"],
+                title=r["title"],
+                artists=r["artists"],
+                bpm=float(r["bpm"]),
+                camelot=r["camelot"],
+                score=float(r["score"]),
+                favorite=r["favorite"],
+                mine=r["mine"],
+                incoming=_bridge_leg(r, "in"),
+                incoming_score=float(r["in_score"]),
+                outgoing=_bridge_leg(r, "out"),
+                outgoing_score=float(r["out_score"]),
+            )
+            for r in rows
+        ]
+
     async def set_favorite(self, user_id: UUID, track_id: UUID, favorite: bool) -> None:
         """Marque ou démarque le morceau comme favori de l'utilisateur (sans effet s'il l'est déjà)."""
         if favorite:
@@ -313,3 +397,17 @@ class TrackRepository:
             )
         assert row is not None
         return row["id"]
+
+
+def _bridge_leg(row: dict[str, Any], side: str) -> TransitionRow:
+    """Un des deux enchaînements d'un pont (colonnes `in_…` ou `out_…`), toujours compatible."""
+    return TransitionRow(
+        key_move=row[f"{side}_key_move"],
+        key_distance=row[f"{side}_key_distance"],
+        half_double=row[f"{side}_half_double"],
+        bpm_diff=float(row[f"{side}_bpm_diff"]),
+        bpm_change=float(row[f"{side}_bpm_change"]),
+        tempo_ok=True,
+        same_mode=row[f"{side}_key_move"] in _SAME_MODE_MOVES,
+        compatible=True,
+    )

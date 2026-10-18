@@ -190,6 +190,29 @@ def test_add_tracks_at_the_end(
     assert unknown.status_code == 404
 
 
+def test_insert_a_track_at_a_position(
+    logged_in_client: TestClient, playlists: dict[str, str], test_prefix: str
+) -> None:
+    url = f"/playlists/{playlists['mine']}/items"
+    e = _track_id(test_prefix, "E")
+
+    def titles() -> list[str]:
+        """Titres de la playlist, dans l'ordre, sans le préfixe."""
+        items = _detail(logged_in_client, playlists["mine"])["items"]
+        return [i["track"]["title"].removeprefix(f"{test_prefix} ") for i in items]
+
+    middle = logged_in_client.post(url, json={"track_id": e, "position": 2})
+    assert middle.status_code == 201 and middle.json()["position"] == 2
+    assert titles() == ["A", "B", "E", "C", "D", "E"]
+
+    assert logged_in_client.post(url, json={"track_id": e, "position": 0}).json()["position"] == 0
+    assert logged_in_client.post(url, json={"track_id": e, "position": 99}).json()["position"] == 7
+    assert titles() == ["E", "A", "B", "E", "C", "D", "E", "E"]
+    assert logged_in_client.post(url, json={"track_id": e, "position": -1}).status_code == 422
+    imported = f"/playlists/{playlists['imported']}/items"
+    assert logged_in_client.post(imported, json={"track_id": e, "position": 0}).status_code == 409
+
+
 def test_imported_playlists_are_read_only(
     logged_in_client: TestClient, playlists: dict[str, str], test_prefix: str
 ) -> None:

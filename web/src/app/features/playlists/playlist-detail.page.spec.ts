@@ -297,6 +297,38 @@ describe('PlaylistDetailPage', () => {
     expect(titles(fixture)).toEqual(['Losing It', 'Trop rapide']);
   });
 
+  it('propose un pont seulement sur l’enchaînement ⚠, et recharge après l’insertion', async () => {
+    const fixture = await render((req) => req.flush(PLAYLIST));
+    expect(all(fixture, 'find-bridge').length).toBe(1);
+
+    all(fixture, 'find-bridge')[0].click();
+    const search = http.expectOne((r) => r.url === '/api/tracks/t2/bridges/t3');
+    search.flush([
+      {
+        track_id: 'p1',
+        title: 'Pont',
+        artists: [],
+        bpm: 124.5,
+        camelot: '6A',
+        score: 0.8,
+        favorite: false,
+        mine: true,
+        incoming: GOOD,
+        incoming_score: 0.9,
+        outgoing: GOOD,
+        outgoing_score: 0.8,
+      },
+    ]);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    all(fixture, 'insert-bridge')[0].click();
+    const insert = http.expectOne('/api/playlists/set/items');
+    expect(insert.request.body).toEqual({ track_id: 'p1', position: 2 });
+    insert.flush({ item_id: 9, position: 2 });
+
+    http.expectOne('/api/playlists/set').flush(PLAYLIST); // enchaînements recalculés
+  });
+
   it('une importée ne se réordonne pas et ne se modifie pas', async () => {
     const fixture = await render((req) => req.flush({ ...PLAYLIST, source_provider: 'spotify' }));
 

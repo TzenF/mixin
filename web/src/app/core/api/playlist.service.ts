@@ -99,10 +99,11 @@ export class PlaylistService {
     return this.http.delete<void>(`/api/playlists/${encodeURIComponent(playlistId)}`);
   }
 
-  /** Ajoute un morceau en fin de playlist ; 409 si elle est importée. */
-  addTrack(playlistId: string, trackId: string): Observable<AddedItem> {
+  /** Ajoute un morceau en fin de playlist, ou à `position` (0 = en tête) ; 409 si elle est importée. */
+  addTrack(playlistId: string, trackId: string, position?: number): Observable<AddedItem> {
     return this.http.post<AddedItem>(`/api/playlists/${encodeURIComponent(playlistId)}/items`, {
       track_id: trackId,
+      ...(position === undefined ? {} : { position }),
     });
   }
 

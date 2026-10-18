@@ -12,7 +12,7 @@ from app.adapters.db import Database
 from app.adapters.queue import TaskQueue
 from app.adapters.track_repository import CatalogFilters, CatalogSort, TrackRepository
 from app.api.deps import get_current_user_id, get_db, get_preview_service, get_queue, get_track_repository
-from app.api.transitions import RatingOut
+from app.api.transitions import RatingOut, Transition
 from app.domain.camelot import CamelotKey
 from app.services.preview import PreviewService
 from app.services.track_correction import (
@@ -114,6 +114,23 @@ class Suggestion(BaseModel):
     my_rating: RatingOut | None
 
 
+class Bridge(BaseModel):
+    """Un morceau qui fait le pont entre A et B ; score = le plus faible des deux enchaînements."""
+
+    track_id: UUID
+    title: str
+    artists: list[str]
+    bpm: float
+    camelot: str
+    score: float
+    favorite: bool
+    mine: bool
+    incoming: Transition
+    incoming_score: float
+    outgoing: Transition
+    outgoing_score: float
+
+
 async def _ensure_exists(tracks: TrackRepository, track_id: UUID) -> None:
     """Lève une erreur 404 si le morceau n'existe pas."""
     if not await tracks.exists(track_id):
@@ -150,6 +167,25 @@ async def suggestions(
         )
         for r in rows
     ]
+
+
+@router.get("/{from_id}/bridges/{to_id}")
+async def bridges(
+    from_id: UUID,
+    to_id: UUID,
+    tracks: Tracks,
+    user_id: CurrentUser,
+    scope: Literal["mine", "all"] = "mine",
+    bpm_tolerance: Annotated[float, Query(gt=0, le=0.2)] = DEFAULT_BPM_TOLERANCE,
+    limit: Annotated[int, Query(ge=1, le=50)] = 5,
+) -> list[Bridge]:
+    """Morceaux (les miens, ou tous avec scope=all) qui s'enchaînent après `from_id` et avant `to_id`."""
+    await _ensure_exists(tracks, from_id)
+    await _ensure_exists(tracks, to_id)
+    rows = await tracks.bridges(
+        from_id, to_id, user_id=user_id, bpm_tolerance=bpm_tolerance, limit=limit, only_mine=scope == "mine"
+    )
+    return [Bridge.model_validate(asdict(r)) for r in rows]
 
 
 @router.get("/{track_id}")

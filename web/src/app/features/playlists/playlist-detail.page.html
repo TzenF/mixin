@@ -208,6 +208,16 @@
                   />
                 }
               </p>
+              @if (t.kind === 'warn' && playlist.source_provider === null && row.nextTrackId) {
+                <app-bridge-finder
+                  [playlistId]="playlist.id"
+                  [fromId]="row.item.track.id"
+                  [toId]="row.nextTrackId"
+                  [position]="i + 1"
+                  [playlistTrackIds]="trackIds()"
+                  (inserted)="onBridgeInserted()"
+                />
+              }
             }
           </li>
         }

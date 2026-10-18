@@ -1,0 +1,62 @@
+<button type="button" class="secondary" (click)="toggle()" data-testid="find-bridge">
+  {{ state().kind === 'closed' ? 'Trouver un pont' : 'Fermer' }}
+</button>
+
+@if (state().kind !== 'closed') {
+  <div class="panel" data-testid="bridges">
+    <label class="toggle">
+      <input
+        #everywhereBox
+        type="checkbox"
+        [checked]="everywhere()"
+        (change)="setEverywhere(everywhereBox.checked)"
+        data-testid="bridges-everywhere"
+      />
+      Chercher aussi hors de mes morceaux (Explorer compris)
+    </label>
+
+    @switch (state().kind) {
+      @case ('loading') {
+        <p class="hint">Recherche…</p>
+      }
+      @case ('error') {
+        <p class="error" data-testid="bridges-error">{{ errorMessage() }}</p>
+      }
+      @case ('ready') {
+        @if (rows().length === 0) {
+          <p class="hint" data-testid="no-bridge">
+            Aucun morceau ne fait le pont{{ everywhere() ? '' : ' parmi tes morceaux' }}.
+          </p>
+        }
+        <ul>
+          @for (row of rows(); track row.bridge.track_id) {
+            <li class="bridge" data-testid="bridge">
+              <app-play-button [trackId]="row.bridge.track_id" />
+              <span class="what">
+                <span class="title">{{ row.bridge.title }}</span>
+                <span class="hint">
+                  {{ row.bridge.artists.join(', ') }} · {{ row.bridge.bpm | number: '1.1-1' }} BPM ·
+                  {{ row.bridge.camelot }}
+                  @if (row.inPlaylist) {
+                    · déjà dans la playlist
+                  }
+                </span>
+                <span class="legs hint"
+                  >Avant : {{ row.incoming }} · Après : {{ row.outgoing }}</span
+                >
+              </span>
+              <button
+                type="button"
+                [disabled]="inserting()"
+                (click)="insert(row.bridge)"
+                data-testid="insert-bridge"
+              >
+                Insérer ici
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    }
+  </div>
+}

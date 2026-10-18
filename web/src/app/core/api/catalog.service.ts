@@ -1,6 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
+import type { Transition } from './playlist.service';
 
 /** Où en est l'analyse audio d'un morceau. */
 export type AnalysisStatus = 'pending' | 'done' | 'no_preview' | 'failed';
@@ -34,6 +35,26 @@ export interface CatalogPage {
 
 /** Type d'enchaînement de tonalité (roue Camelot). */
 export type KeyMove = 'same' | 'adjacent' | 'relative' | 'diagonal' | 'energy_shift';
+
+/** Un morceau qui fait le pont entre A et B : A → lui et lui → B passent (voir backend/app/api/tracks.py). */
+export interface Bridge {
+  track_id: string;
+  title: string;
+  artists: string[];
+  bpm: number;
+  camelot: string;
+  /** Le plus faible des deux enchaînements. */
+  score: number;
+  favorite: boolean;
+  /** Dans une de mes playlists ou en favori. */
+  mine: boolean;
+  /** A → ce morceau. */
+  incoming: Transition;
+  incoming_score: number;
+  /** Ce morceau → B. */
+  outgoing: Transition;
+  outgoing_score: number;
+}
 
 /** Ma note d'un enchaînement A → B (1 à 5) et mon commentaire éventuel. */
 export interface TransitionRating {
@@ -160,6 +181,15 @@ export class CatalogService {
     return this.http.get<Suggestion[]>(`/api/tracks/${encodeURIComponent(trackId)}/suggestions`, {
       params,
     });
+  }
+
+  /** Morceaux qui font le pont entre `fromId` et `toId` (les miens, ou tous avec scope « all »). */
+  bridges(fromId: string, toId: string, scope: 'mine' | 'all', limit = 5): Observable<Bridge[]> {
+    const params = new HttpParams().set('scope', scope).set('limit', limit);
+    return this.http.get<Bridge[]>(
+      `/api/tracks/${encodeURIComponent(fromId)}/bridges/${encodeURIComponent(toId)}`,
+      { params },
+    );
   }
 
   /** Met le morceau dans mes favoris, ou l'en retire. */

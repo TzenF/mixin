@@ -8,7 +8,7 @@ from uuid import UUID
 
 from app.adapters.db import Queryable
 from app.adapters.rating_repository import RATING_JOIN_SQL, RatingRow
-from app.adapters.track_repository import TRACK_COLUMNS_SQL, CatalogRow
+from app.adapters.track_repository import TRACK_COLUMNS_SQL, CatalogRow, TransitionRow
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,20 +37,6 @@ class ExternalTrackRow:
     track_id: UUID
     isrc: str | None
     external_id: str | None
-
-
-@dataclass(frozen=True, slots=True)
-class TransitionRow:
-    """Enchaînement d'un morceau vers le suivant (voir la fonction SQL transition)."""
-
-    key_move: str | None
-    key_distance: int
-    half_double: bool
-    bpm_diff: float
-    bpm_change: float
-    tempo_ok: bool  # écart de BPM dans la tolérance (le reste vient de la tonalité)
-    same_mode: bool  # même lettre Camelot (mineur/mineur ou majeur/majeur)
-    compatible: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,6 +148,27 @@ class PlaylistRepository:
                       COALESCE((SELECT max(position) + 1 FROM playlist_item WHERE playlist_id = %(id)s), 0)
                RETURNING id, position""",
             {"id": playlist_id, "track_id": track_id},
+        )
+        assert row is not None
+        await self._touch(playlist_id)
+        return row["id"], row["position"]
+
+    async def insert_item(self, playlist_id: UUID, track_id: UUID, position: int) -> tuple[int, int]:
+        """Insère le morceau à cette position (au plus en fin) ; les suivants descendent.
+
+        Unicité des positions vérifiée au commit (contrainte DEFERRABLE) : à appeler sous `lock`.
+        """
+        await self._db.fetch_one(
+            """UPDATE playlist_item SET position = position + 1
+               WHERE playlist_id = %(id)s AND position >= %(position)s""",
+            {"id": playlist_id, "position": position},
+        )
+        row = await self._db.fetch_one(
+            """INSERT INTO playlist_item (playlist_id, track_id, position)
+               SELECT %(id)s, %(track_id)s,
+                      LEAST(%(position)s, (SELECT count(*) FROM playlist_item WHERE playlist_id = %(id)s))
+               RETURNING id, position""",
+            {"id": playlist_id, "track_id": track_id, "position": position},
         )
         assert row is not None
         await self._touch(playlist_id)

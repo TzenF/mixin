@@ -27,6 +27,7 @@ import {
   TRANSITION_DISCLAIMER,
 } from '../../shared/play-transition-button/play-transition-button.component';
 import { TransitionRatingComponent } from '../../shared/transition-rating/transition-rating.component';
+import { BridgeFinderComponent } from './bridge-finder/bridge-finder.component';
 import { FavoriteButtonComponent } from '../../shared/favorite-button/favorite-button.component';
 import { describeTransition } from '../../shared/key-moves';
 import { PlaylistTextFormat, playlistFileName, playlistText } from '../../shared/playlist-text';
@@ -52,6 +53,7 @@ type State =
     PlayButtonComponent,
     PlayTransitionButtonComponent,
     TransitionRatingComponent,
+    BridgeFinderComponent,
   ],
   templateUrl: './playlist-detail.page.html',
   styleUrl: './playlist-detail.page.scss',
@@ -91,6 +93,11 @@ export class PlaylistDetailPage {
     }));
   });
 
+  /** Morceaux de la playlist (un pont déjà présent est signalé). */
+  protected readonly trackIds = computed(
+    () => new Set((this.playlist()?.items ?? []).map((i) => i.track.id)),
+  );
+
   /** Nombre d'enchaînements à vérifier (⚠) et inconnus. */
   protected readonly counts = computed(() => {
     const transitions = this.rows().flatMap((r) => (r.transition ? [r.transition] : []));
@@ -120,6 +127,19 @@ export class PlaylistDetailPage {
   /** Après une correction de BPM ou de tonalité : enchaînements recalculés. */
   protected onCorrected(): void {
     this.reload();
+  }
+
+  /** Après l'insertion d'un pont : nouveaux enchaînements, et playlist en cours à jour si c'est elle. */
+  protected onBridgeInserted(): void {
+    this.reload();
+    this.refreshCurrentPlaylist();
+  }
+
+  /** Si cette playlist est la playlist en cours, recharge la liste de ses morceaux. */
+  private refreshCurrentPlaylist(): void {
+    if (this.currentPlaylist.current()?.id === this.playlistId) {
+      this.currentPlaylist.select(this.playlistId);
+    }
   }
 
   /** Recharge la playlist sans afficher « Chargement… » (après un déplacement ou un retrait). */
@@ -199,9 +219,7 @@ export class PlaylistDetailPage {
     this.service.removeItem(this.playlistId, item.item_id).subscribe({
       next: () => {
         this.reload();
-        if (this.currentPlaylist.current()?.id === this.playlistId) {
-          this.currentPlaylist.select(this.playlistId); // recharge la liste de ses morceaux
-        }
+        this.refreshCurrentPlaylist();
       },
       error: (err: HttpErrorResponse) => this.fail(err, 'Impossible de retirer ce morceau.'),
     });
