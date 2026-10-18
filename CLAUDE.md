@@ -84,7 +84,7 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Utilisateurs, comptes musicaux | `app/adapters/user_repository.py` → `UserRepository` |
 | Sessions de connexion | `app/services/sessions.py` → `SessionService` (dépôt : `SessionRepository`) |
 | Playlists en base | `app/adapters/playlist_repository.py` → `PlaylistRepository` (dont `list_for_owner`, `get_for_owner`, `items_with_transitions`) ; routes `GET /playlists`, `GET /playlists/{id}` |
-| Modifier mes playlists (créer, renommer, ajouter, réordonner, retirer, dupliquer, supprimer) | `app/services/playlist_editor.py` → `PlaylistEditor` (importée = lecture seule → 409 ; pas à moi → 404 ; ordre périmé → 422, via `api/errors.py`). Écritures : verrou `PlaylistRepository.lock` dans une transaction ; `add_track(…, position)` insère à une place (`POST /playlists/{id}/items` avec `position`), `insert_tracks` plusieurs d'un coup, tout ou rien (`POST /playlists/{id}/items/batch`) ; tout passe par `PlaylistRepository.insert_items` |
+| Modifier mes playlists (créer, renommer, ajouter, réordonner, retirer, dupliquer, supprimer) | `app/services/playlist_editor.py` → `PlaylistEditor` (importée = lecture seule → 409 ; pas à moi → 404 ; ordre périmé → 422, via `api/errors.py`). Écritures : verrou `PlaylistRepository.lock` dans une transaction ; réglages (nom, créneau, part jouée) : `update(changes)` → `PlaylistRepository.update` (colonnes d'une liste fermée), `PATCH /playlists/{id}` (champ absent = inchangé) ; `remove_items` (tout ou rien, `POST /playlists/{id}/items/remove`) ; `add_track(…, position)` insère à une place (`POST /playlists/{id}/items` avec `position`), `insert_tracks` plusieurs d'un coup, tout ou rien (`POST /playlists/{id}/items/batch`) ; tout passe par `PlaylistRepository.insert_items` |
 | Journal des imports | `app/adapters/import_job_repository.py` → `ImportJobRepository` |
 | Appel HTTP vers une API externe | `app/adapters/http_retry.py` → `request_with_retry` (gère les 429 / `Retry-After`) |
 | Chiffrer un jeton avant stockage | `app/adapters/token_cipher.py` → `TokenCipher` (clé `TOKEN_ENCRYPTION_KEY`) |
@@ -108,6 +108,7 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Chemin de A à B (1 à 4 morceaux) | SQL `transition_edges(user, ids, tolerance)` (graphe des enchaînements compatibles) via `TrackRepository.transition_graph` / `.transitions_between` ; recherche `app/domain/set_path.py` → `find_paths` ; `services/set_path.py` → `PathFinder` ; route `GET /tracks/{a}/paths/{b}` ; front `CatalogService.paths`, `PlaylistService.insertTracks`, dans `bridge-finder` |
 | Courbe du BPM d'une playlist (SVG, sans dépendance) | `web/src/app/features/playlists/playlist-curve/` (segments colorés par `describeTransition`, ⚠ sur les refusés, survol et clavier, largeur mesurée par `ResizeObserver`) ; jetons `$chart-stroke-width`, `$chart-hairline`, `$chart-ring-width`, `$width-tooltip` |
 | Roue de Camelot d'une playlist (SVG, sans dépendance) | `web/src/app/features/playlists/camelot-wheel/` (tonalités jouées, un trait par paire, épaisseur = passages répétés, rouge + ⚠ si tonalité incompatible, début / fin) ; à côté de la courbe (`.charts` dans la page de détail) |
+| Durée du set, tenir le créneau | `playlist.slot_minutes`, `.played_percent` (migration 009) ; `app/domain/set_cut.py` → `suggest_cuts`, `set_quality` ; `services/set_duration.py` → `SetCutter` ; route `GET /playlists/{id}/cut-proposal` ; front `web/src/app/shared/duration.ts` (`formatDuration`, `formatClock`, `playedDuration`), composant `features/playlists/set-duration/` |
 | Proposer un ordre pour une playlist | `app/domain/reorder.py` → `best_order`, `order_quality` ; `services/playlist_reorder.py` → `PlaylistReorderer` ; route `GET /playlists/{id}/order/proposal` (appliquer = `PUT /playlists/{id}/order`) ; front `PlaylistService.proposeOrder`, composant `features/playlists/order-proposal/` |
 | Plusieurs morceaux par identifiant (valeurs vues par moi) | `TrackRepository.by_ids(user, ids)` |
 | Morceau pont entre A et B | SQL `bridge_tracks(user, a, b, tolerance, limit)` (score = le plus faible des deux enchaînements), via `TrackRepository.bridges` ; route `GET /tracks/{a}/bridges/{b}` ; front `CatalogService.bridges`, composant `features/playlists/bridge-finder/` |
@@ -218,6 +219,10 @@ réécrite se vérifie avant/après dans une transaction `REPEATABLE READ` (rés
 
 - **psycopg + fonctions SQL** : caster les paramètres (`%(x)s::uuid`, `::numeric`, `::integer`), sinon
   PostgreSQL ne trouve pas la fonction.
+- **Choisir des morceaux à retirer** : retirer un bout de set ne coûte qu'un enchaînement, un algorithme glouton
+  retire alors toujours l'ouverture et la fin (vu le 18/10/2026) → les bouts sont protégés. Un enchaînement
+  inconnu (morceau non analysé) compte comme un enchaînement moyen, pas 0 : sinon les morceaux pas encore
+  analysés partent toujours en premier.
 - **`key_confidence` est un `real`** : une fonction SQL qui le reçoit le prend en `double precision` (un paramètre
   `numeric` n'est pas trouvé, et convertir en `numeric` changerait le calcul du score).
 - **Spotify, mode développement (règles de février 2026)** : Premium requis pour le propriétaire de l'app,
@@ -373,9 +378,11 @@ Prochaines idées (proposées le 18/10/2026, dans l'ordre conseillé ; une à la
    (niveau 3) : trier l'Explorer par meilleure place possible dans mon set.
 
 Idées suivantes (retenues le 18/10/2026, dans l'ordre ; une à la fois, plan validé avant de coder) :
-1. **Durée du set et « couper pour tenir le créneau »** : durée totale et heure de passage de chaque morceau
-   (`duration_ms`), créneau à saisir ; si ça dépasse, proposer les morceaux à retirer qui abîment le moins les
-   enchaînements. Limite : durée des morceaux entiers, pas celle réellement jouée en mixant.
+1. ~~**Durée du set et « couper pour tenir le créneau »**~~ : fait (18/10/2026). Créneau et part jouée (50 à
+   100 %) enregistrés avec la playlist ; heure de passage de chaque morceau ; « Proposer quoi retirer » (d'abord ce
+   qui répare un ⚠, puis ce qui casse le moins, le plus long à égalité ; jamais l'ouverture ni le dernier
+   morceau), puis « Retirer ces morceaux » (tout ou rien). Peut retirer un morceau de plus que nécessaire (choix
+   par dégâts, pas par durée). Rendu dans le navigateur pas encore vérifié.
 2. **Carte de ma bibliothèque** : roue de Camelot en carte de chaleur (morceaux par tonalité) et histogramme des
    BPM ; un trou (tonalité ou plage de BPM absente) ouvre l'Explorer filtré dessus.
 3. **Annuler la dernière modification d'une playlist** (ordre appliqué, pont, chemin, « Insérer ici »).
