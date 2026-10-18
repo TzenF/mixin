@@ -107,12 +107,13 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Morceaux compatibles | SQL `suggest_tracks(user, seed, tolerance, limit)`, via `TrackRepository.suggestions` (filtre « mes morceaux » appliqué avant la limite) |
 | Chemin de A à B (1 à 4 morceaux) | SQL `transition_edges(user, ids, tolerance)` (graphe des enchaînements compatibles) via `TrackRepository.transition_graph` / `.transitions_between` ; recherche `app/domain/set_path.py` → `find_paths` ; `services/set_path.py` → `PathFinder` ; route `GET /tracks/{a}/paths/{b}` ; front `CatalogService.paths`, `PlaylistService.insertTracks`, dans `bridge-finder` |
 | Courbe du BPM d'une playlist (SVG, sans dépendance) | `web/src/app/features/playlists/playlist-curve/` (segments colorés par `describeTransition`, ⚠ sur les refusés, survol et clavier, largeur mesurée par `ResizeObserver`) ; jetons `$chart-stroke-width`, `$chart-hairline`, `$chart-ring-width`, `$width-tooltip` |
+| Roue de Camelot d'une playlist (SVG, sans dépendance) | `web/src/app/features/playlists/camelot-wheel/` (tonalités jouées, un trait par paire, épaisseur = passages répétés, rouge + ⚠ si tonalité incompatible, début / fin) ; à côté de la courbe (`.charts` dans la page de détail) |
 | Proposer un ordre pour une playlist | `app/domain/reorder.py` → `best_order`, `order_quality` ; `services/playlist_reorder.py` → `PlaylistReorderer` ; route `GET /playlists/{id}/order/proposal` (appliquer = `PUT /playlists/{id}/order`) ; front `PlaylistService.proposeOrder`, composant `features/playlists/order-proposal/` |
 | Plusieurs morceaux par identifiant (valeurs vues par moi) | `TrackRepository.by_ids(user, ids)` |
 | Morceau pont entre A et B | SQL `bridge_tracks(user, a, b, tolerance, limit)` (score = le plus faible des deux enchaînements), via `TrackRepository.bridges` ; route `GET /tracks/{a}/bridges/{b}` ; front `CatalogService.bridges`, composant `features/playlists/bridge-finder/` |
 | SQL partagé du dépôt des morceaux | `track_repository.py` → `_ARTISTS_SQL` (artistes dans l'ordre), `_MINE_SQL` (« mes morceaux » = mes playlists + mes favoris), `_FAVORITE_SQL`, `_FAVORITES_ONLY_SQL` |
 | Favoris | `TrackRepository.set_favorite` ; routes `PUT` / `DELETE /tracks/{id}/favorite` ; champ `favorite` et filtre `favorites=true` (catalogue, suggestions) |
-| Styles | `web/src/styles/_tokens.scss`, `_mixins.scss` (`page`, `panel`, `status`, `reset-list`, `control`, `button-primary`, `button-secondary`, `button-accent`, `icon-button`, `icon-button-on`, `toolbar`, `card-button`, `badge`, `status(success | danger | accent)`, `progress-bar`, `field`, `filter-bar`, `focus-ring`, `text-muted`, `text-danger`, `transition-kinds`) |
+| Styles | `web/src/styles/_tokens.scss`, `_mixins.scss` (`page`, `panel`, `status`, `reset-list`, `control`, `button-primary`, `button-secondary`, `button-accent`, `icon-button`, `icon-button-on`, `toolbar`, `card-button`, `badge`, `status(success | danger | accent)`, `progress-bar`, `field`, `filter-bar`, `focus-ring`, `text-muted`, `text-danger`, `transition-kinds` (texte d'un enchaînement), `chart-transition-color(propriété)` (trait / flèche / légende d'un enchaînement dans un graphique)) ; jeton `$font-size-xs` |
 | Message d'erreur d'API (front) | `web/src/app/core/api/api-error.ts` → `apiErrorMessage` |
 | Session côté front | `web/src/app/core/api/auth.service.ts` → `AuthService`, `SPOTIFY_LOGIN_URL` |
 | Menu principal | `web/src/app/app.ts` → `NAV_LINKS` (ajouter une page ici et dans `app.routes.ts`) |
@@ -281,6 +282,9 @@ réécrite se vérifie avant/après dans une transaction `REPEATABLE READ` (rés
 - **Les tests PostgreSQL tournent sur la base de dev** (choix assumé), qui contient de vrais morceaux
   analysés : un test ne vérifie que **ses propres lignes** (filtre sur ses ID ou son `test_prefix`), jamais
   « le résultat entier ».
+- **Pas de navigateur sur la machine de dev** (ni Chrome headless, ni Claude in Chrome) : pour regarder un
+  graphique, rendre le SVG du composant en image avec `@resvg/resvg-js` installé dans le dossier temporaire
+  (jamais dans le projet), le SVG étant extrait par un test temporaire supprimé ensuite.
 - Postgres et Redis ne sont publiés que sur `127.0.0.1` (mots de passe de dev, Redis sans authentification).
 
 ## Mise en ligne (pas encore faite : à revoir le jour d'un déploiement)
@@ -356,7 +360,8 @@ Prochaines idées (proposées le 18/10/2026, dans l'ordre conseillé ; une à la
    énergie, ne sait pas construire une montée. Parcours dans le navigateur pas encore vérifié.
 4. **Courbe de la playlist** : 4a ~~courbe du BPM~~ faite et vérifiée dans le navigateur (18/10/2026) : BPM
    morceau par morceau, enchaînements colorés (bleu / rouge + ⚠, couleurs passées au validateur dataviz), la
-   liste en dessous sert de tableau équivalent. Reste 4b : parcours sur la roue de Camelot. Front seulement.
+   liste en dessous sert de tableau équivalent. 4b ~~roue de Camelot~~ faite (18/10/2026), redessinée après un
+   premier rendu « pâteux » : petits points, noms à côté, un trait par paire sans flèche, arcs sur un même anneau.
 5. **Explorer « compatibles avec mes favoris »** : ne montrer que les morceaux qui s'enchaînent avec au moins un
    favori. Coût à mesurer avant de promettre (environ 500 morceaux × favoris).
 
