@@ -84,7 +84,7 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Utilisateurs, comptes musicaux | `app/adapters/user_repository.py` → `UserRepository` |
 | Sessions de connexion | `app/services/sessions.py` → `SessionService` (dépôt : `SessionRepository`) |
 | Playlists en base | `app/adapters/playlist_repository.py` → `PlaylistRepository` (dont `list_for_owner`, `get_for_owner`, `items_with_transitions`) ; routes `GET /playlists`, `GET /playlists/{id}` |
-| Modifier mes playlists (créer, renommer, ajouter, réordonner, retirer, dupliquer, supprimer) | `app/services/playlist_editor.py` → `PlaylistEditor` (importée = lecture seule → 409 ; pas à moi → 404 ; ordre périmé → 422, via `api/errors.py`). Écritures : verrou `PlaylistRepository.lock` dans une transaction ; `add_track(…, position)` insère à une place (`POST /playlists/{id}/items` avec `position`) |
+| Modifier mes playlists (créer, renommer, ajouter, réordonner, retirer, dupliquer, supprimer) | `app/services/playlist_editor.py` → `PlaylistEditor` (importée = lecture seule → 409 ; pas à moi → 404 ; ordre périmé → 422, via `api/errors.py`). Écritures : verrou `PlaylistRepository.lock` dans une transaction ; `add_track(…, position)` insère à une place (`POST /playlists/{id}/items` avec `position`), `insert_tracks` plusieurs d'un coup, tout ou rien (`POST /playlists/{id}/items/batch`) ; tout passe par `PlaylistRepository.insert_items` |
 | Journal des imports | `app/adapters/import_job_repository.py` → `ImportJobRepository` |
 | Appel HTTP vers une API externe | `app/adapters/http_retry.py` → `request_with_retry` (gère les 429 / `Retry-After`) |
 | Chiffrer un jeton avant stockage | `app/adapters/token_cipher.py` → `TokenCipher` (clé `TOKEN_ENCRYPTION_KEY`) |
@@ -105,6 +105,8 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Valeur BPM/tonalité à afficher | SQL `effective_features(user)` |
 | Règle d'enchaînement entre deux morceaux | SQL `transition(a_bpm, a_num, a_letter, b_bpm, b_num, b_letter, tolerance)` (migrations 003–004) : utilisée par `suggest_tracks`, `bridge_tracks` et les playlists ; score d'un enchaînement : SQL `transition_score` (006) ; ligne Python `TransitionRow` (`track_repository.py`), modèle d'API `Transition` (`api/transitions.py`) |
 | Morceaux compatibles | SQL `suggest_tracks(user, seed, tolerance, limit)`, via `TrackRepository.suggestions` (filtre « mes morceaux » appliqué avant la limite) |
+| Chemin de A à B (1 à 4 morceaux) | SQL `transition_edges(user, ids, tolerance)` (graphe des enchaînements compatibles) via `TrackRepository.transition_graph` / `.transitions_between` ; recherche `app/domain/set_path.py` → `find_paths` ; `services/set_path.py` → `PathFinder` ; route `GET /tracks/{a}/paths/{b}` ; front `CatalogService.paths`, `PlaylistService.insertTracks`, dans `bridge-finder` |
+| Plusieurs morceaux par identifiant (valeurs vues par moi) | `TrackRepository.by_ids(user, ids)` |
 | Morceau pont entre A et B | SQL `bridge_tracks(user, a, b, tolerance, limit)` (score = le plus faible des deux enchaînements), via `TrackRepository.bridges` ; route `GET /tracks/{a}/bridges/{b}` ; front `CatalogService.bridges`, composant `features/playlists/bridge-finder/` |
 | SQL partagé du dépôt des morceaux | `track_repository.py` → `_ARTISTS_SQL` (artistes dans l'ordre), `_MINE_SQL` (« mes morceaux » = mes playlists + mes favoris), `_FAVORITE_SQL`, `_FAVORITES_ONLY_SQL` |
 | Favoris | `TrackRepository.set_favorite` ; routes `PUT` / `DELETE /tracks/{id}/favorite` ; champ `favorite` et filtre `favorites=true` (catalogue, suggestions) |
@@ -341,8 +343,11 @@ Prochaines idées (proposées le 18/10/2026, dans l'ordre conseillé ; une à la
 1. ~~**Morceau pont**~~ : fait (18/10/2026). Sur un enchaînement refusé A → B d'une playlist, « Trouver un pont »
    propose les morceaux C tels que A → C et C → B passent, puis « Insérer ici ». Mesuré : 36 ms pour 5 recherches
    sur tout le catalogue ; parcours complet dans le navigateur pas encore vérifié.
-2. **Chemin entre deux morceaux** : de A à B en 3 à 6 morceaux compatibles (recherche dans le graphe des
-   enchaînements, limitée à « mes morceaux » pour rester rapide) ; généralise le pont.
+2. ~~**Chemin entre deux morceaux**~~ : fait (18/10/2026). Quand aucun pont n'existe, « Chercher un chemin »
+   propose jusqu'à 3 chemins de 2 à 4 morceaux (le plus court, puis le meilleur maillon faible), insérés d'un coup.
+   Coût : 0,35 s dans mes morceaux, 1,8 s dans tout le catalogue (906 morceaux, 88 160 enchaînements), en
+   carré du nombre de morceaux : à surveiller. Préférence « BPM toujours dans le même sens » écartée pour
+   l'instant. Parcours dans le navigateur pas encore vérifié.
 3. **Réordonner une playlist** : proposer l'ordre qui maximise le score des enchaînements (heuristique, 20 à
    40 morceaux), avec aperçu avant / après, sans écraser. Limite : sans énergie, ne sait pas construire une montée.
 4. **Courbe de la playlist** : BPM morceau par morceau, enchaînements colorés selon leur qualité, parcours sur la
