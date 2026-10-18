@@ -59,6 +59,7 @@ class CatalogTrack(BaseModel):
     mine: bool
     rank: int | None = None
     fit_count: int | None = None
+    duration_ms: int | None = None
 
 
 class Catalog(BaseModel):

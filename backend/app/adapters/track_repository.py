@@ -50,9 +50,8 @@ class CatalogRow:
     favorite: bool
     mine: bool  # dans une de mes playlists ou en favori
     rank: int | None = None  # place dans la source de l'Explorer (1 = premier), None hors source
-    fit_count: int | None = (
-        None  # morceaux de la playlist demandée avec lesquels il s'enchaîne (playlist_fit)
-    )
+    fit_count: int | None = None  # liens avec la playlist demandée (playlist_fit)
+    duration_ms: int | None = None  # durée du morceau entier (Spotify ou Deezer)
 
 
 @dataclass(frozen=True, slots=True)
@@ -193,7 +192,7 @@ WHERE {_MINE_SQL}
 
 # Colonnes d'un CatalogRow, pour un morceau `t` joint à effective_features `f` (catalogue, playlists).
 TRACK_COLUMNS_SQL = f"""
-       t.id, t.title, {_ARTISTS_SQL} AS artists,
+       t.id, t.title, {_ARTISTS_SQL} AS artists, t.duration_ms,
        f.bpm::float AS bpm,
        f.camelot_num || f.camelot_letter AS camelot,
        f.bpm_source::text AS bpm_source, f.key_source::text AS key_source,

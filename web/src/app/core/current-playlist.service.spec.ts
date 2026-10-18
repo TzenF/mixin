@@ -10,6 +10,8 @@ const MINE: PlaylistSummary = {
   source_provider: null,
   track_count: 1,
   updated_at: '2026-10-16T14:00:00Z',
+  slot_minutes: null,
+  played_percent: 100,
 };
 const IMPORTED: PlaylistSummary = { ...MINE, id: 'mixy', name: 'Mixy', source_provider: 'spotify' };
 

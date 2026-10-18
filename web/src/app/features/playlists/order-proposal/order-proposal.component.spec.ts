@@ -39,6 +39,8 @@ const PLAYLIST: PlaylistDetail = {
   source_provider: null,
   track_count: 3,
   updated_at: '2026-10-18T10:00:00Z',
+  slot_minutes: null,
+  played_percent: 100,
   spotify_export: null,
   items: [
     {

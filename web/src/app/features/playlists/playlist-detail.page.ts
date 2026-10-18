@@ -30,8 +30,10 @@ import { TransitionRatingComponent } from '../../shared/transition-rating/transi
 import { BridgeFinderComponent } from './bridge-finder/bridge-finder.component';
 import { OrderProposalComponent } from './order-proposal/order-proposal.component';
 import { PlaylistCurveComponent } from './playlist-curve/playlist-curve.component';
+import { SetDurationComponent } from './set-duration/set-duration.component';
 import { CamelotWheelComponent } from './camelot-wheel/camelot-wheel.component';
 import { FavoriteButtonComponent } from '../../shared/favorite-button/favorite-button.component';
+import { formatClock, playedDuration } from '../../shared/duration';
 import { describeTransition } from '../../shared/key-moves';
 import { PlaylistTextFormat, playlistFileName, playlistText } from '../../shared/playlist-text';
 
@@ -60,6 +62,7 @@ type State =
     OrderProposalComponent,
     PlaylistCurveComponent,
     CamelotWheelComponent,
+    SetDurationComponent,
   ],
   templateUrl: './playlist-detail.page.html',
   styleUrl: './playlist-detail.page.scss',
@@ -89,14 +92,24 @@ export class PlaylistDetailPage {
     return s.kind === 'ready' ? s.playlist : null;
   });
 
-  /** Morceaux avec l'enchaînement vers le suivant (null pour le dernier). */
+  /** Morceaux avec l'enchaînement vers le suivant (null pour le dernier) et leur heure de passage. */
   protected readonly rows = computed(() => {
-    const items = this.playlist()?.items ?? [];
-    return items.map((item, i) => ({
-      item,
-      transition: i < items.length - 1 ? describeTransition(item.transition_to_next) : null,
-      nextTrackId: items[i + 1]?.track.id ?? null,
-    }));
+    const playlist = this.playlist();
+    const items = playlist?.items ?? [];
+    const percent = playlist?.played_percent ?? 100;
+    let start = 0;
+    return items.map((item, i) => {
+      const duration = playedDuration(item.track.duration_ms, percent);
+      const row = {
+        item,
+        transition: i < items.length - 1 ? describeTransition(item.transition_to_next) : null,
+        nextTrackId: items[i + 1]?.track.id ?? null,
+        start: formatClock(start),
+        duration: item.track.duration_ms ? formatClock(duration) : null,
+      };
+      start += duration;
+      return row;
+    });
   });
 
   /** Morceaux de la playlist (un pont déjà présent est signalé). */
@@ -137,6 +150,12 @@ export class PlaylistDetailPage {
 
   /** Après l'insertion d'un pont : nouveaux enchaînements, et playlist en cours à jour si c'est elle. */
   protected onBridgeInserted(): void {
+    this.reload();
+    this.refreshCurrentPlaylist();
+  }
+
+  /** Après un changement de créneau ou un retrait de morceaux : playlist rechargée. */
+  protected onDurationChanged(): void {
     this.reload();
     this.refreshCurrentPlaylist();
   }

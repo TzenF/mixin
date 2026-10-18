@@ -20,6 +20,8 @@ class PlaylistRow:
     source_provider: str | None
     track_count: int
     updated_at: datetime
+    slot_minutes: int | None = None  # créneau visé (None : pas de créneau)
+    played_percent: int = 100  # part de chaque morceau jouée en mixant
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,11 +53,15 @@ class PlaylistItemRow:
 
 
 _PLAYLIST_SQL = """
-SELECT p.id, p.name, p.source_provider::text AS source_provider, p.updated_at,
+SELECT p.id, p.name, p.source_provider::text AS source_provider, p.updated_at, p.slot_minutes,
+       p.played_percent::integer AS played_percent,
        (SELECT count(*) FROM playlist_item pi WHERE pi.playlist_id = p.id)::integer AS track_count
 FROM playlist p
 WHERE p.owner_id = %(owner)s::uuid
 """
+
+# Réglages modifiables d'une playlist (PlaylistRepository.update).
+_EDITABLE_COLUMNS = ("name", "slot_minutes", "played_percent")
 
 # Morceaux dans l'ordre, valeurs affichées pour l'utilisateur, et enchaînement vers le suivant (LEAD).
 _ITEMS_SQL = f"""
@@ -182,14 +188,15 @@ class PlaylistRepository:
         )
         await self._touch(playlist_id)
 
-    async def remove_item(self, playlist_id: UUID, item_id: int) -> bool:
-        """Retire l'élément et recompacte les positions ; False s'il n'est pas dans cette playlist."""
-        row = await self._db.fetch_one(
-            "DELETE FROM playlist_item WHERE id = %(item)s AND playlist_id = %(id)s RETURNING id",
-            {"id": playlist_id, "item": item_id},
+    async def remove_items(self, playlist_id: UUID, item_ids: list[int]) -> int:
+        """Retire ces éléments, recompacte les positions ; renvoie le nombre retiré (les autres : ignorés)."""
+        rows = await self._db.fetch_all(
+            """DELETE FROM playlist_item
+               WHERE id = ANY(%(items)s::bigint[]) AND playlist_id = %(id)s RETURNING id""",
+            {"id": playlist_id, "items": item_ids},
         )
-        if row is None:
-            return False
+        if not rows:
+            return 0
         await self._db.fetch_one(
             """UPDATE playlist_item pi SET position = (r.rn - 1)::integer
                FROM (SELECT id, row_number() OVER (ORDER BY position) AS rn
@@ -198,7 +205,7 @@ class PlaylistRepository:
             {"id": playlist_id},
         )
         await self._touch(playlist_id)
-        return True
+        return len(rows)
 
     async def copy_items(self, source_id: UUID, target_id: UUID) -> None:
         """Recopie les morceaux de `source_id` dans `target_id`, dans le même ordre."""
@@ -218,11 +225,16 @@ class PlaylistRepository:
             "UPDATE playlist SET updated_at = now() WHERE id = %(id)s", {"id": playlist_id}
         )
 
-    async def rename(self, playlist_id: UUID, name: str) -> None:
-        """Change le nom de la playlist."""
+    async def update(self, playlist_id: UUID, changes: dict[str, object]) -> None:
+        """Change ces réglages (nom, créneau, part jouée) ; un réglage absent reste tel quel."""
+        columns = [c for c in _EDITABLE_COLUMNS if c in changes]
+        if not columns:
+            return
+        # Noms de colonnes tirés d'une liste fermée : jamais une valeur venue de la requête HTTP.
+        assignments = ", ".join(f"{c} = %({c})s" for c in columns)
         await self._db.fetch_one(
-            "UPDATE playlist SET name = %(name)s, updated_at = now() WHERE id = %(id)s",
-            {"id": playlist_id, "name": name},
+            f"UPDATE playlist SET {assignments}, updated_at = now() WHERE id = %(id)s",
+            {"id": playlist_id, **{c: changes[c] for c in columns}},
         )
 
     async def replace_items(self, playlist_id: UUID, track_ids: list[UUID]) -> None:

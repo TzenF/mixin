@@ -16,6 +16,7 @@ from app.api.deps import (
     get_playlist_exporter,
     get_playlist_reorderer,
     get_playlist_repository,
+    get_set_cutter,
     get_spotify_connection,
     get_spotify_provider,
 )
@@ -25,6 +26,7 @@ from app.domain.reorder import OrderQuality
 from app.services.playlist_editor import PlaylistEditor
 from app.services.playlist_export import PlaylistExporter
 from app.services.playlist_reorder import PlaylistReorderer
+from app.services.set_duration import SetCutter
 from app.services.spotify_connection import SpotifyConnection
 
 router = APIRouter(prefix="/playlists", tags=["playlists"])
@@ -45,6 +47,8 @@ class PlaylistSummary(BaseModel):
     source_provider: str | None
     track_count: int
     updated_at: datetime
+    slot_minutes: int | None
+    played_percent: int
 
 
 class PlaylistItem(BaseModel):
@@ -136,12 +140,67 @@ async def create_playlist(body: PlaylistNameIn, editor: Editor, user_id: Current
     return PlaylistSummary(**asdict(await editor.create(user_id, body.name)))
 
 
+class PlaylistChanges(BaseModel):
+    """Réglages à changer : un champ absent reste tel quel ; slot_minutes à null retire le créneau."""
+
+    name: PlaylistName | None = None
+    slot_minutes: Annotated[int, Field(ge=1, le=1440)] | None = None
+    played_percent: Annotated[int, Field(ge=50, le=100)] | None = None
+
+
 @router.patch("/{playlist_id}")
-async def rename_playlist(
-    playlist_id: UUID, body: PlaylistNameIn, editor: Editor, user_id: CurrentUser
+async def update_playlist(
+    playlist_id: UUID, body: PlaylistChanges, editor: Editor, user_id: CurrentUser
 ) -> PlaylistSummary:
-    """Renomme une de mes playlists ; 409 si elle est importée."""
-    return PlaylistSummary(**asdict(await editor.rename(user_id, playlist_id, body.name)))
+    """Renomme une de mes playlists, ou change son créneau et sa part jouée ; 409 si elle est importée."""
+    changes = {field: getattr(body, field) for field in body.model_fields_set}
+    if changes.get("name", "") is None or ("played_percent" in changes and changes["played_percent"] is None):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Ce réglage ne peut pas être vide")
+    return PlaylistSummary(**asdict(await editor.update(user_id, playlist_id, changes)))
+
+
+class CutProposalOut(BaseModel):
+    """Morceaux à retirer pour tenir le créneau (à appliquer avec POST …/items/remove), et le bilan."""
+
+    remove_item_ids: list[int]
+    total_ms: int
+    total_after_ms: int
+    slot_ms: int | None
+    refused_before: int
+    refused_after: int
+
+
+@router.get("/{playlist_id}/cut-proposal")
+async def propose_cut(
+    playlist_id: UUID,
+    cutter: Annotated[SetCutter, Depends(get_set_cutter)],
+    user_id: CurrentUser,
+) -> CutProposalOut:
+    """Quels morceaux retirer pour tenir le créneau (rien sans créneau) ; 404 si pas à moi, 409 importée."""
+    p = await cutter.propose(user_id, playlist_id, DEFAULT_BPM_TOLERANCE)
+    return CutProposalOut(
+        remove_item_ids=p.remove_item_ids,
+        total_ms=p.total_ms,
+        total_after_ms=p.total_after_ms,
+        slot_ms=p.slot_ms,
+        refused_before=p.before.refused,
+        refused_after=p.after.refused,
+    )
+
+
+class ItemsToRemove(BaseModel):
+    """Éléments de la playlist à retirer ensemble."""
+
+    item_ids: Annotated[list[int], Field(min_length=1, max_length=1000)]
+
+
+@router.post("/{playlist_id}/items/remove", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_items(
+    playlist_id: UUID, body: ItemsToRemove, editor: Editor, user_id: CurrentUser
+) -> Response:
+    """Retire plusieurs morceaux d'un coup (tout ou rien) ; 404 si l'un n'est pas dans la playlist."""
+    await editor.remove_items(user_id, playlist_id, body.item_ids)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.delete("/{playlist_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -44,7 +44,8 @@ ol {
   border: t.$border-width solid var(--color-border);
 }
 
-.index {
+.index,
+.clock {
   @include m.text-muted;
   font-variant-numeric: tabular-nums;
 }

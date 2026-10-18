@@ -9,6 +9,8 @@ export const FAKE_PLAYLIST: PlaylistSummary = {
   source_provider: null,
   track_count: 0,
   updated_at: '2026-10-16T14:00:00Z',
+  slot_minutes: null,
+  played_percent: 100,
 };
 
 /**

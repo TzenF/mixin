@@ -1,0 +1,43 @@
+@use 'mixins' as m;
+@use 'tokens' as t;
+
+:host {
+  display: block;
+  margin-bottom: t.$space-4;
+}
+
+.panel {
+  @include m.panel;
+  border: t.$border-width solid var(--color-border);
+}
+
+.status {
+  @include m.toolbar;
+  margin: 0 0 t.$space-2;
+}
+
+.hint {
+  @include m.text-muted;
+}
+
+.over,
+.error {
+  @include m.text-danger;
+}
+
+.fits {
+  color: var(--color-success-text);
+}
+
+.settings {
+  @include m.filter-bar;
+  margin-bottom: t.$space-2;
+}
+
+.proposal ul {
+  margin: 0 0 t.$space-2;
+}
+
+.toolbar {
+  @include m.toolbar;
+}

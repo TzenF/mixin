@@ -1,0 +1,88 @@
+<section class="panel" data-testid="set-duration">
+  <p class="status">
+    <strong data-testid="set-total">Durée : {{ format(total()) }}</strong>
+    @if (playlist().played_percent < 100) {
+      <span class="hint">(en jouant {{ playlist().played_percent }} % de chaque morceau)</span>
+    }
+    @if (slotStatus(); as s) {
+      @if (s.over) {
+        <span class="over" data-testid="set-over">
+          ⚠ {{ format(s.diff) }} de trop pour un créneau de {{ format(s.slotMs) }}
+        </span>
+      } @else {
+        <span class="fits" data-testid="set-fits">
+          ✓ Tient dans le créneau de {{ format(s.slotMs) }}, il reste {{ format(s.diff) }}
+        </span>
+      }
+    }
+  </p>
+
+  @if (playlist().source_provider === null) {
+    <form class="settings" novalidate (submit)="$event.preventDefault(); save(slot, percent)">
+      <label>
+        Mon créneau (min)
+        <input
+          #slot
+          type="number"
+          min="1"
+          max="1440"
+          placeholder="aucun"
+          [value]="playlist().slot_minutes ?? ''"
+          data-testid="slot-input"
+        />
+      </label>
+      <label>
+        Part jouée (%)
+        <input
+          #percent
+          type="number"
+          min="50"
+          max="100"
+          [value]="playlist().played_percent"
+          data-testid="percent-input"
+        />
+      </label>
+      <button type="submit" class="secondary" [disabled]="saving()" data-testid="save-settings">
+        Enregistrer
+      </button>
+      @if (slotStatus()?.over) {
+        <button type="button" [disabled]="saving()" (click)="toggleCut()" data-testid="propose-cut">
+          {{ cut().kind === 'closed' ? 'Proposer quoi retirer' : 'Fermer' }}
+        </button>
+      }
+    </form>
+    @if (saveError(); as message) {
+      <p class="error" data-testid="settings-error">{{ message }}</p>
+    }
+  }
+
+  @switch (cut().kind) {
+    @case ('loading') {
+      <p class="hint">Calcul…</p>
+    }
+    @case ('error') {
+      <p class="error" data-testid="cut-error">{{ cutError() }}</p>
+    }
+  }
+  @if (proposal(); as p) {
+    <div class="proposal" data-testid="cut-proposal">
+      <p>
+        Retirer {{ toRemove().length }} morceau{{ toRemove().length > 1 ? 'x' : '' }} (−{{
+          format(p.total_ms - p.total_after_ms)
+        }}) → {{ format(p.total_after_ms) }} · enchaînements ⚠ : {{ p.refused_before }} →
+        {{ p.refused_after }}
+      </p>
+      <ul>
+        @for (t of toRemove(); track t.place) {
+          <li data-testid="cut-item">{{ t.place }}. {{ t.title }}</li>
+        }
+      </ul>
+      <p class="toolbar">
+        <button type="button" [disabled]="saving()" (click)="apply(p)" data-testid="apply-cut">
+          Retirer ces morceaux
+        </button>
+        <button type="button" class="secondary" (click)="toggleCut()">Annuler</button>
+      </p>
+    </div>
+  }
+</section>

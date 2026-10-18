@@ -27,6 +27,8 @@ export interface CatalogTrack {
   rank?: number | null;
   /** Avec combien de morceaux de la playlist demandée (`fitsPlaylist`) il s'enchaîne ; null : aucun ou déjà dedans. */
   fit_count?: number | null;
+  /** Durée du morceau entier (Spotify ou Deezer), ou null si inconnue. */
+  duration_ms?: number | null;
 }
 
 /** Une page du catalogue ; total = nombre de morceaux qui passent les filtres. */

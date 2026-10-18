@@ -329,6 +329,55 @@ def test_placements_in_a_playlist(
     assert imported.status_code == 409
 
 
+def test_slot_and_cut_proposal(
+    logged_in_client: TestClient, playlists: dict[str, str], test_prefix: str
+) -> None:
+    # Set = A (124, 6A), B (125, 7A), C (135, 7A : refusé après B), D (pas analysé), E (124, 12A)
+    # 4 min chacun
+    with psycopg.connect(get_settings().database_url, autocommit=True) as conn:
+        conn.execute("UPDATE track SET duration_ms = 240000 WHERE title LIKE %s", (f"{test_prefix} %",))
+    url = f"/playlists/{playlists['mine']}"
+
+    assert logged_in_client.get(f"{url}/cut-proposal").json()["slot_ms"] is None  # pas de créneau
+    changed = logged_in_client.patch(url, json={"slot_minutes": 12})
+    assert changed.status_code == 200
+    assert (changed.json()["slot_minutes"], changed.json()["played_percent"]) == (12, 100)
+
+    proposal = logged_in_client.get(f"{url}/cut-proposal").json()
+    items = {
+        i["item_id"]: i["track"]["title"].removeprefix(f"{test_prefix} ")
+        for i in _detail(logged_in_client, url.removeprefix("/playlists/"))["items"]
+    }
+    # 20 min pour 12 : retirer C répare B -> C, puis B (retirer D ferait B -> E, refusé) ; A et E restent
+    assert [items[i] for i in proposal["remove_item_ids"]] == ["B", "C"]
+    assert (proposal["total_ms"], proposal["total_after_ms"]) == (1_200_000, 720_000)
+    assert (proposal["refused_before"], proposal["refused_after"]) == (1, 0)
+
+    # À 50 %, le set ne dure plus que 10 min : rien à retirer
+    logged_in_client.patch(url, json={"played_percent": 50})
+    assert logged_in_client.get(f"{url}/cut-proposal").json()["remove_item_ids"] == []
+    assert logged_in_client.patch(url, json={"played_percent": 30}).status_code == 422
+    assert logged_in_client.patch(url, json={"name": None}).status_code == 422
+    cleared = logged_in_client.patch(url, json={"slot_minutes": None}).json()
+    assert (cleared["slot_minutes"], cleared["name"]) == (None, f"{test_prefix} Set")  # le nom n'a pas bougé
+
+
+def test_remove_several_items_all_or_nothing(
+    logged_in_client: TestClient, playlists: dict[str, str], test_prefix: str
+) -> None:
+    detail = _detail(logged_in_client, playlists["mine"])
+    ids = [i["item_id"] for i in detail["items"]]
+    url = f"/playlists/{playlists['mine']}/items/remove"
+
+    assert logged_in_client.post(url, json={"item_ids": [ids[0], 999_999_999]}).status_code == 404
+    assert len(_detail(logged_in_client, playlists["mine"])["items"]) == 5  # tout ou rien
+
+    assert logged_in_client.post(url, json={"item_ids": [ids[1], ids[3]]}).status_code == 204
+    after = _detail(logged_in_client, playlists["mine"])["items"]
+    assert [i["track"]["title"].removeprefix(f"{test_prefix} ") for i in after] == ["A", "C", "E"]
+    assert [i["position"] for i in after] == [0, 1, 2]  # positions recompactées
+
+
 def test_imported_playlists_are_read_only(
     logged_in_client: TestClient, playlists: dict[str, str], test_prefix: str
 ) -> None:

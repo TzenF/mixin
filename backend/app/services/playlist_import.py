@@ -97,7 +97,7 @@ class PlaylistImporter:
         playlists = PlaylistRepository(tx)
         existing = await playlists.find_by_source(user_id, self._provider.name, external_id)
         if existing is not None:
-            await playlists.rename(existing, name)
+            await playlists.update(existing, {"name": name})
             return existing, False
         return await playlists.create_imported(user_id, name, self._provider.name, external_id), True
 

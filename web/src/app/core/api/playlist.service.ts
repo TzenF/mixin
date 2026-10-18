@@ -27,6 +27,20 @@ export interface PlaylistSummary {
   source_provider: string | null;
   track_count: number;
   updated_at: string;
+  /** Créneau visé en minutes, ou null. */
+  slot_minutes: number | null;
+  /** Part de chaque morceau jouée en mixant (100 = en entier). */
+  played_percent: number;
+}
+
+/** Morceaux à retirer pour tenir le créneau (à appliquer avec `removeItems`), et le bilan. */
+export interface CutProposal {
+  remove_item_ids: number[];
+  total_ms: number;
+  total_after_ms: number;
+  slot_ms: number | null;
+  refused_before: number;
+  refused_after: number;
 }
 
 /** Enchaînement vers le morceau suivant (voir la fonction SQL transition). */
@@ -108,6 +122,31 @@ export class PlaylistService {
   rename(playlistId: string, name: string): Observable<PlaylistSummary> {
     return this.http.patch<PlaylistSummary>(`/api/playlists/${encodeURIComponent(playlistId)}`, {
       name,
+    });
+  }
+
+  /** Change le créneau (null : aucun) ou la part jouée ; un réglage absent reste tel quel. */
+  updateSettings(
+    playlistId: string,
+    settings: { slot_minutes?: number | null; played_percent?: number },
+  ): Observable<PlaylistSummary> {
+    return this.http.patch<PlaylistSummary>(
+      `/api/playlists/${encodeURIComponent(playlistId)}`,
+      settings,
+    );
+  }
+
+  /** Quels morceaux retirer pour tenir le créneau ; rien n'est modifié. */
+  proposeCut(playlistId: string): Observable<CutProposal> {
+    return this.http.get<CutProposal>(
+      `/api/playlists/${encodeURIComponent(playlistId)}/cut-proposal`,
+    );
+  }
+
+  /** Retire plusieurs morceaux d'un coup (tout ou rien). */
+  removeItems(playlistId: string, itemIds: number[]): Observable<void> {
+    return this.http.post<void>(`/api/playlists/${encodeURIComponent(playlistId)}/items/remove`, {
+      item_ids: itemIds,
     });
   }
 

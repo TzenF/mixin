@@ -135,6 +135,10 @@
       }
     </p>
 
+    @if (playlist.items.length > 0) {
+      <app-set-duration [playlist]="playlist" (changed)="onDurationChanged()" />
+    }
+
     <div class="charts">
       <app-playlist-curve class="curve" [items]="playlist.items" />
       <app-camelot-wheel [items]="playlist.items" />
@@ -168,6 +172,9 @@
                 >
               }
               <span class="index">{{ i + 1 }}</span>
+              <span class="clock" title="Heure de passage" data-testid="start-time">{{
+                row.start
+              }}</span>
               <app-play-button
                 [trackId]="row.item.track.id"
                 [noPreview]="row.item.track.analysis_status === 'no_preview'"
@@ -184,6 +191,9 @@
                 {{ row.item.track.bpm === null ? '—' : (row.item.track.bpm | number: '1.1-1') }} BPM
                 ·
                 {{ row.item.track.camelot ?? '—' }}
+                @if (row.duration) {
+                  · {{ row.duration }}
+                }
               </span>
               <button
                 type="button"

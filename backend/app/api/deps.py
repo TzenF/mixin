@@ -25,6 +25,7 @@ from app.services.playlist_import import PlaylistImporter
 from app.services.playlist_reorder import PlaylistReorderer
 from app.services.preview import PreviewService
 from app.services.sessions import SessionService
+from app.services.set_duration import SetCutter
 from app.services.spotify_connection import SpotifyConnection
 
 SESSION_COOKIE = "session"
@@ -113,6 +114,11 @@ def get_playlist_importer(
 def get_playlist_reorderer(db: Annotated[Database, Depends(get_db)]) -> PlaylistReorderer:
     """Fournit le service qui propose un meilleur ordre pour une playlist."""
     return PlaylistReorderer(db)
+
+
+def get_set_cutter(db: Annotated[Database, Depends(get_db)]) -> SetCutter:
+    """Fournit le service qui propose quoi retirer pour tenir le créneau."""
+    return SetCutter(db)
 
 
 def get_playlist_editor(db: Annotated[Database, Depends(get_db)]) -> PlaylistEditor:

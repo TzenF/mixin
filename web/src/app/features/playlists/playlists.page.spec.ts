@@ -13,6 +13,8 @@ const SET: PlaylistSummary = {
   source_provider: null,
   track_count: 12,
   updated_at: '2026-10-16T14:00:00Z',
+  slot_minutes: null,
+  played_percent: 100,
 };
 const MIXY: PlaylistSummary = {
   ...SET,

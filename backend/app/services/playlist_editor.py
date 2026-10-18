@@ -45,11 +45,11 @@ class PlaylistEditor:
         playlist_id = await repo.create(owner_id, name)
         return await owned_playlist(repo, owner_id, playlist_id)
 
-    async def rename(self, owner_id: UUID, playlist_id: UUID, name: str) -> PlaylistRow:
-        """Renomme une de mes playlists modifiables."""
+    async def update(self, owner_id: UUID, playlist_id: UUID, changes: dict[str, object]) -> PlaylistRow:
+        """Change le nom, le créneau ou la part jouée d'une playlist modifiable (absent = inchangé)."""
         repo = PlaylistRepository(self._db)
         await editable_playlist(repo, owner_id, playlist_id)
-        await repo.rename(playlist_id, name)
+        await repo.update(playlist_id, changes)
         return await owned_playlist(repo, owner_id, playlist_id)
 
     async def delete(self, owner_id: UUID, playlist_id: UUID) -> None:
@@ -92,11 +92,16 @@ class PlaylistEditor:
 
     async def remove_item(self, owner_id: UUID, playlist_id: UUID, item_id: int) -> None:
         """Retire un morceau de la playlist (les suivants remontent d'une place)."""
+        await self.remove_items(owner_id, playlist_id, [item_id])
+
+    async def remove_items(self, owner_id: UUID, playlist_id: UUID, item_ids: list[int]) -> None:
+        """Retire ces morceaux d'un coup (tout ou rien : un seul absent, et rien n'est retiré)."""
         async with self._db.transaction() as tx:
             repo = PlaylistRepository(tx)
             await editable_playlist(repo, owner_id, playlist_id)
             await repo.lock(playlist_id)
-            if not await repo.remove_item(playlist_id, item_id):
+            wanted = set(item_ids)
+            if await repo.remove_items(playlist_id, list(wanted)) != len(wanted):
                 raise TrackMissingError("Ce morceau n'est pas dans la playlist")
 
     async def copy(self, owner_id: UUID, playlist_id: UUID) -> PlaylistRow:
