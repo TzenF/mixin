@@ -372,7 +372,19 @@ Prochaines idées (proposées le 18/10/2026, dans l'ordre conseillé ; une à la
    puis les deux côtés, puis un seul ; « Insérer ici » à la bonne position ; 18 à 39 ms). À faire plus tard
    (niveau 3) : trier l'Explorer par meilleure place possible dans mon set.
 
-Autres idées (à décider) : corrections globales (admin).
+Idées suivantes (retenues le 18/10/2026, dans l'ordre ; une à la fois, plan validé avant de coder) :
+1. **Durée du set et « couper pour tenir le créneau »** : durée totale et heure de passage de chaque morceau
+   (`duration_ms`), créneau à saisir ; si ça dépasse, proposer les morceaux à retirer qui abîment le moins les
+   enchaînements. Limite : durée des morceaux entiers, pas celle réellement jouée en mixant.
+2. **Carte de ma bibliothèque** : roue de Camelot en carte de chaleur (morceaux par tonalité) et histogramme des
+   BPM ; un trou (tonalité ou plage de BPM absente) ouvre l'Explorer filtré dessus.
+3. **Annuler la dernière modification d'une playlist** (ordre appliqué, pont, chemin, « Insérer ici »).
+4. **Compteur sur l'accueil** : « N nouveaux morceaux de l'Explorer rentrent dans ton set en cours »
+   (`playlist_fit`).
+
+Écartées (18/10/2026) : points de mix intro / outro (impossible avec 30 s d'extrait) ; « mode cabine » (le mix se
+fait dans rekordbox). À décider : journal « déjà joué », version extended (recherche Spotify limitée à 10
+résultats), « energy boost » +7 (changerait la règle d'enchaînement), corrections globales (admin).
 
 Retirés (16/10/2026) : **import XML rekordbox** (l'autrice utilise rekordbox seulement comme destination, via
 Spotify) et donc **export M3U** (sans import rekordbox, aucun chemin de fichier audio : un M3U serait vide).
