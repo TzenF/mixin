@@ -106,6 +106,7 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Règle d'enchaînement entre deux morceaux | SQL `transition(a_bpm, a_num, a_letter, b_bpm, b_num, b_letter, tolerance)` (migrations 003–004) : utilisée par `suggest_tracks`, `bridge_tracks` et les playlists ; score d'un enchaînement : SQL `transition_score` (006) ; ligne Python `TransitionRow` (`track_repository.py`), modèle d'API `Transition` (`api/transitions.py`) |
 | Morceaux compatibles | SQL `suggest_tracks(user, seed, tolerance, limit)`, via `TrackRepository.suggestions` (filtre « mes morceaux » appliqué avant la limite) |
 | Chemin de A à B (1 à 4 morceaux) | SQL `transition_edges(user, ids, tolerance)` (graphe des enchaînements compatibles) via `TrackRepository.transition_graph` / `.transitions_between` ; recherche `app/domain/set_path.py` → `find_paths` ; `services/set_path.py` → `PathFinder` ; route `GET /tracks/{a}/paths/{b}` ; front `CatalogService.paths`, `PlaylistService.insertTracks`, dans `bridge-finder` |
+| Courbe du BPM d'une playlist (SVG, sans dépendance) | `web/src/app/features/playlists/playlist-curve/` (segments colorés par `describeTransition`, ⚠ sur les refusés, survol et clavier, largeur mesurée par `ResizeObserver`) ; jetons `$chart-stroke-width`, `$chart-hairline`, `$chart-ring-width`, `$width-tooltip` |
 | Proposer un ordre pour une playlist | `app/domain/reorder.py` → `best_order`, `order_quality` ; `services/playlist_reorder.py` → `PlaylistReorderer` ; route `GET /playlists/{id}/order/proposal` (appliquer = `PUT /playlists/{id}/order`) ; front `PlaylistService.proposeOrder`, composant `features/playlists/order-proposal/` |
 | Plusieurs morceaux par identifiant (valeurs vues par moi) | `TrackRepository.by_ids(user, ids)` |
 | Morceau pont entre A et B | SQL `bridge_tracks(user, a, b, tolerance, limit)` (score = le plus faible des deux enchaînements), via `TrackRepository.bridges` ; route `GET /tracks/{a}/bridges/{b}` ; front `CatalogService.bridges`, composant `features/playlists/bridge-finder/` |
@@ -353,8 +354,9 @@ Prochaines idées (proposées le 18/10/2026, dans l'ordre conseillé ; une à la
    d'enchaînements refusés, puis la meilleure somme des scores ; aperçu, puis « Appliquer ». Heuristique limitée à
    5 passes (399 morceaux : 1,7 s, 330 → 3 refus ; 30 passes = 7,2 s pour le même résultat). Limite : sans
    énergie, ne sait pas construire une montée. Parcours dans le navigateur pas encore vérifié.
-4. **Courbe de la playlist** : BPM morceau par morceau, enchaînements colorés selon leur qualité, parcours sur la
-   roue de Camelot. Front seulement.
+4. **Courbe de la playlist** : 4a ~~courbe du BPM~~ faite et vérifiée dans le navigateur (18/10/2026) : BPM
+   morceau par morceau, enchaînements colorés (bleu / rouge + ⚠, couleurs passées au validateur dataviz), la
+   liste en dessous sert de tableau équivalent. Reste 4b : parcours sur la roue de Camelot. Front seulement.
 5. **Explorer « compatibles avec mes favoris »** : ne montrer que les morceaux qui s'enchaînent avec au moins un
    favori. Coût à mesurer avant de promettre (environ 500 morceaux × favoris).
 
