@@ -1,0 +1,109 @@
+@use 'mixins' as m;
+@use 'tokens' as t;
+
+:host {
+  display: block;
+  margin-bottom: t.$space-4;
+}
+
+figure {
+  @include m.panel;
+  margin: 0;
+  border: t.$border-width solid var(--color-border);
+}
+
+figcaption {
+  margin-bottom: t.$space-2;
+  font-weight: t.$font-weight-bold;
+}
+
+// Conteneur de l'infobulle (positionnée par rapport au graphique).
+.plot {
+  position: relative;
+}
+
+// Mesuré par ResizeObserver : la largeur suit le conteneur (sans défilement horizontal sur téléphone).
+svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  @include m.focus-ring;
+}
+
+.grid {
+  stroke: var(--color-border);
+  stroke-width: t.$chart-hairline;
+}
+
+.axis {
+  fill: var(--color-text-muted);
+  font-size: t.$font-size-sm;
+  font-variant-numeric: tabular-nums;
+}
+
+.crosshair {
+  stroke: var(--color-text-muted);
+  stroke-width: t.$chart-hairline;
+}
+
+.segment {
+  stroke-width: t.$chart-stroke-width;
+  stroke-linecap: round;
+
+  &.ok {
+    stroke: var(--color-primary);
+  }
+
+  &.warn {
+    stroke: var(--color-danger-text);
+  }
+
+  &.unknown {
+    stroke: var(--color-text-muted);
+  }
+}
+
+.warn-mark {
+  fill: var(--color-danger-text);
+  font-size: t.$font-size-sm;
+}
+
+// Point : anneau couleur du fond pour rester lisible sur les segments.
+.marker {
+  fill: var(--color-primary);
+  stroke: var(--color-surface);
+  stroke-width: t.$chart-ring-width;
+
+  &.active {
+    fill: var(--color-text);
+  }
+}
+
+.label {
+  fill: var(--color-text);
+  font-size: t.$font-size-sm;
+}
+
+.tooltip {
+  @include m.panel;
+  position: absolute;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: t.$space-1;
+  max-width: t.$width-tooltip;
+  margin-left: t.$space-3;
+  border: t.$border-width solid var(--color-border);
+  font-size: t.$font-size-sm;
+  pointer-events: none;
+
+  &.flip {
+    transform: translateX(-100%);
+    margin-left: -(t.$space-3);
+  }
+}
+
+.hint {
+  @include m.text-muted;
+}

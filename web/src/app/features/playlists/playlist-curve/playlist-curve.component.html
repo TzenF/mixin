@@ -1,0 +1,121 @@
+@if (drawable()) {
+  <figure data-testid="curve">
+    <figcaption>BPM morceau par morceau</figcaption>
+    <div class="plot" #plot>
+      <svg
+        [attr.width]="width()"
+        [attr.height]="height"
+        [attr.viewBox]="'0 0 ' + width() + ' ' + height"
+        role="img"
+        [attr.aria-label]="summary()"
+        tabindex="0"
+        (pointermove)="onPointerMove($event)"
+        (pointerleave)="active.set(null)"
+        (focus)="onFocus()"
+        (blur)="active.set(null)"
+        (keydown)="onKeydown($event)"
+        data-testid="curve-svg"
+      >
+        @for (tick of yTicks(); track tick.value) {
+          <line
+            class="grid"
+            [attr.x1]="margin.left"
+            [attr.x2]="width() - margin.right"
+            [attr.y1]="tick.y"
+            [attr.y2]="tick.y"
+          />
+          <text
+            class="axis"
+            [attr.x]="margin.left - 8"
+            [attr.y]="tick.y"
+            text-anchor="end"
+            dy="0.35em"
+          >
+            {{ tick.value }}
+          </text>
+        }
+        @for (point of xLabels(); track point.index) {
+          <text class="axis" [attr.x]="point.x" [attr.y]="height - 8" text-anchor="middle">
+            {{ point.index + 1 }}
+          </text>
+        }
+
+        @if (tooltip(); as t) {
+          <line
+            class="crosshair"
+            [attr.x1]="t.point.x"
+            [attr.x2]="t.point.x"
+            [attr.y1]="margin.top"
+            [attr.y2]="height - margin.bottom"
+          />
+        }
+
+        @for (s of segments(); track $index) {
+          <line
+            [attr.class]="'segment ' + s.kind"
+            [attr.x1]="s.x1"
+            [attr.y1]="s.y1"
+            [attr.x2]="s.x2"
+            [attr.y2]="s.y2"
+            data-testid="curve-segment"
+          />
+        }
+        @for (w of warnings(); track $index) {
+          <text
+            class="warn-mark"
+            [attr.x]="w.x"
+            [attr.y]="w.y - 8"
+            text-anchor="middle"
+            data-testid="curve-warning"
+          >
+            ⚠
+          </text>
+        }
+        @for (p of markers(); track p.index) {
+          <circle
+            class="marker"
+            [class.active]="tooltip()?.point?.index === p.index"
+            [attr.cx]="p.x"
+            [attr.cy]="p.y"
+            [attr.r]="markerRadius"
+            data-testid="curve-marker"
+          />
+        }
+        @for (e of extremes(); track e.point.index) {
+          <text
+            class="label"
+            [attr.x]="e.point.x"
+            [attr.y]="(e.point.y ?? 0) + (e.above ? -12 : 20)"
+            text-anchor="middle"
+            data-testid="curve-extreme"
+          >
+            {{ e.point.item.track.bpm | number: '1.0-1' }}
+          </text>
+        }
+      </svg>
+
+      @if (tooltip(); as t) {
+        <div
+          class="tooltip"
+          [class.flip]="t.flip"
+          [style.left.px]="t.point.x"
+          role="status"
+          data-testid="curve-tooltip"
+        >
+          @if (t.point.item.track.bpm !== null) {
+            <strong
+              >{{ t.point.item.track.bpm | number: '1.1-1' }} BPM ·
+              {{ t.point.item.track.camelot }}</strong
+            >
+          } @else {
+            <strong>Pas encore analysé</strong>
+          }
+          <span>{{ t.point.index + 1 }}. {{ t.point.item.track.title }}</span>
+          @if (t.next; as next) {
+            <span class="hint">{{ next }}</span>
+          }
+        </div>
+      }
+    </div>
+  </figure>
+}

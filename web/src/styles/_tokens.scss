@@ -40,11 +40,17 @@ $opacity-disabled: 0.5; // bouton désactivé
 $width-field-sm: 5.5rem; // petit champ numérique (BPM)
 $width-card: 14rem; // largeur minimale d'une carte de l'accueil
 $width-narrow: 32rem;
+$width-tooltip: 16rem; // infobulle d'un graphique
 $width-page: 72rem;
 
 // --- Contrôles : boutons et champs ont la même hauteur, pour s'aligner sur une ligne ---
 $control-height: 2.25rem;
 $control-height-sm: 1.75rem; // petits boutons dans une ligne (▶, ★, ⇄, notes 1 à 5)
+
+// --- Graphiques (méthode dataviz : traits fins, quadrillage discret, anneau autour des points) ---
+$chart-stroke-width: 2px; // courbes
+$chart-hairline: 1px; // quadrillage, axes, ligne de survol
+$chart-ring-width: 2px; // anneau couleur du fond autour des points
 
 // --- Ombre des cartes ---
 $shadow-card:

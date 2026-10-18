@@ -135,6 +135,8 @@
       }
     </p>
 
+    <app-playlist-curve [items]="playlist.items" />
+
     @if (playlist.source_provider === null && playlist.items.length > 2) {
       <app-order-proposal [playlist]="playlist" (applied)="onOrderApplied()" />
     }
