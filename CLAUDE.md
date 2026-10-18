@@ -119,7 +119,7 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Menu principal | `web/src/app/app.ts` → `NAV_LINKS` (ajouter une page ici et dans `app.routes.ts`) |
 | Sources de l'Explorer (front) | `web/src/app/core/api/explore.service.ts` → `ExploreService` |
 | Playlists côté front | `web/src/app/core/api/playlist.service.ts` → `PlaylistService` |
-| Playlist « en cours » (front) | `web/src/app/core/current-playlist.service.ts` → `CurrentPlaylistService` ; pour les tests des pages : `FakeCurrentPlaylistService` (`current-playlist.service.fake.ts`) |
+| Playlist « en cours » (front) | `web/src/app/core/current-playlist.service.ts` → `CurrentPlaylistService` (`add(trackId, position?)`) ; pour les tests des pages : `FakeCurrentPlaylistService` (`current-playlist.service.fake.ts`) |
 | Bouton ★ / ☆ (front) | `web/src/app/shared/favorite-button/` |
 | URL d'un extrait Deezer (à l'écoute, jamais stockée) | `services/preview.py` → `PreviewService` ; route `GET /tracks/{id}/preview` (`no-store`, 404 avec `reason`, 503 si Deezer flanche) ; `DeezerClient.get_track`, `preview_expiry` |
 | Lecture des extraits (front, un seul son à la fois) | `web/src/app/core/audio-player.service.ts` → `AudioPlayerService` (`toggle`, `toggleTransition`, `AUDIO_FACTORY`) ; pour les tests : `FakeAudioPlayerService` |
@@ -136,7 +136,9 @@ Projet personnel et de portfolio, développé seule, 15–20 h/semaine. L'autric
 | Lien de playlist Deezer collé (site, app, ID seul) | `app/domain/deezer_link.py` → `playlist_id_from_link`, `is_short_link` ; lien de l'app : `DeezerClient.resolve_short_link` |
 | Liste de morceaux filtrable (front) | `web/src/app/shared/track-browser/` (`mode="catalog"` ou `"explore"`, `[source]`) : utilisée par le Catalogue et l'Explorer |
 | Faire télécharger un fichier par le navigateur | `web/src/app/core/file-download.service.ts` → `FileDownloadService.saveText` |
-| Catalogue côté front | `web/src/app/core/api/catalog.service.ts` → `CatalogService` (`tracks`, `track`, `suggestions`, `flipMode`) |
+| Catalogue côté front | `web/src/app/core/api/catalog.service.ts` → `CatalogService` (`tracks`, `track`, `suggestions`, `flipMode`, `bridges`, `paths`, `placements`) |
+| Liens d'un morceau avec une playlist (« ce qui rentre dans mon set ») | SQL `playlist_fit(user, playlist, tolerance)` (migration 008) ; `GET /tracks?fits=<playlist>&fits_only=true` → champ `fit_count` (`CatalogFilters.fits_playlist` / `fits_only`) ; case et badge dans `track-browser` |
+| Où insérer un morceau dans ma playlist | `app/domain/placement.py` → `find_placements` ; `services/placement.py` → `PlacementFinder` ; route `GET /tracks/{id}/placements?playlist=` ; composant `web/src/app/shared/placement-finder/` |
 
 Tenir ce tableau à jour quand on ajoute un élément réutilisable.
 
@@ -348,12 +350,12 @@ V2, dans l'ordre (une étape à la fois, plan validé avant de coder) :
 Prochaines idées (proposées le 18/10/2026, dans l'ordre conseillé ; une à la fois, plan validé avant de coder) :
 1. ~~**Morceau pont**~~ : fait (18/10/2026). Sur un enchaînement refusé A → B d'une playlist, « Trouver un pont »
    propose les morceaux C tels que A → C et C → B passent, puis « Insérer ici ». Mesuré : 36 ms pour 5 recherches
-   sur tout le catalogue ; parcours complet dans le navigateur pas encore vérifié.
+   sur tout le catalogue ; vérifié dans le navigateur.
 2. ~~**Chemin entre deux morceaux**~~ : fait (18/10/2026). Quand aucun pont n'existe, « Chercher un chemin »
    propose jusqu'à 3 chemins de 2 à 4 morceaux (le plus court, puis le meilleur maillon faible), insérés d'un coup.
    Coût : 0,35 s dans mes morceaux, 1,8 s dans tout le catalogue (906 morceaux, 88 160 enchaînements), en
    carré du nombre de morceaux : à surveiller. Préférence « BPM toujours dans le même sens » écartée pour
-   l'instant. Parcours dans le navigateur pas encore vérifié.
+   l'instant. Vérifié dans le navigateur.
 3. ~~**Réordonner une playlist**~~ : fait (18/10/2026). « Proposer un ordre » (ouverture comprise) : le moins
    d'enchaînements refusés, puis la meilleure somme des scores ; aperçu, puis « Appliquer ». Heuristique limitée à
    5 passes (399 morceaux : 1,7 s, 330 → 3 refus ; 30 passes = 7,2 s pour le même résultat). Limite : sans
@@ -362,8 +364,13 @@ Prochaines idées (proposées le 18/10/2026, dans l'ordre conseillé ; une à la
    morceau par morceau, enchaînements colorés (bleu / rouge + ⚠, couleurs passées au validateur dataviz), la
    liste en dessous sert de tableau équivalent. 4b ~~roue de Camelot~~ faite (18/10/2026), redessinée après un
    premier rendu « pâteux » : petits points, noms à côté, un trait par paire sans flèche, arcs sur un même anneau.
-5. **Explorer « compatibles avec mes favoris »** : ne montrer que les morceaux qui s'enchaînent avec au moins un
-   favori. Coût à mesurer avant de promettre (environ 500 morceaux × favoris).
+5. ~~**Ce qui rentre dans mon set**~~ (idée de départ : « compatibles avec mes favoris ») : fait et vérifié dans le
+   navigateur (18/10/2026). Référence = **playlist en cours** : mesuré, 2 favoris seulement (58 morceaux sur 531)
+   et « mes morceaux » laisse tout passer (513 sur 513), alors qu'une playlist de 22 trie la moitié (251 sur 522).
+   Livraison 1 : case « S'enchaîne avec ma playlist en cours » et badge « ↔ N morceaux » (pas une place !) dans
+   l'Explorer et le catalogue (66 ms par page, 111 ms filtré). Livraison 2 : « Où le placer ? » (réparation d'un ⚠,
+   puis les deux côtés, puis un seul ; « Insérer ici » à la bonne position ; 18 à 39 ms). À faire plus tard
+   (niveau 3) : trier l'Explorer par meilleure place possible dans mon set.
 
 Autres idées (à décider) : corrections globales (admin).
 
