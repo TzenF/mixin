@@ -28,8 +28,19 @@
   @include m.text-danger;
 }
 
-ul {
+ul,
+ol {
   @include m.reset-list;
+}
+
+// Un chemin : morceaux et enchaînements alternés, séparés du suivant par un filet.
+.path {
+  padding: t.$space-2 0;
+  border-top: t.$border-width solid var(--color-border);
+}
+
+.step {
+  padding-left: t.$space-6;
 }
 
 .bridge {

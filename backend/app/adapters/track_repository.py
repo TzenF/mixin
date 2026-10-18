@@ -83,6 +83,14 @@ class BridgeRow:
 
 
 @dataclass(frozen=True, slots=True)
+class ScoredTransition:
+    """Un enchaînement compatible et son score (voir transition_edges en SQL)."""
+
+    transition: TransitionRow
+    score: float
+
+
+@dataclass(frozen=True, slots=True)
 class CatalogPage:
     """Une page du catalogue et le nombre total de morceaux qui passent les filtres."""
 
@@ -316,13 +324,58 @@ class TrackRepository:
                 score=float(r["score"]),
                 favorite=r["favorite"],
                 mine=r["mine"],
-                incoming=_bridge_leg(r, "in"),
+                incoming=_compatible_transition(r, "in_"),
                 incoming_score=float(r["in_score"]),
-                outgoing=_bridge_leg(r, "out"),
+                outgoing=_compatible_transition(r, "out_"),
                 outgoing_score=float(r["out_score"]),
             )
             for r in rows
         ]
+
+    async def transition_graph(
+        self, user_id: UUID, include: list[UUID], bpm_tolerance: float, only_mine: bool = True
+    ) -> dict[UUID, list[tuple[UUID, float]]]:
+        """Graphe des enchaînements compatibles entre mes morceaux (ou tous), `include` toujours compris.
+
+        Pour chaque morceau : les morceaux vers lesquels il s'enchaîne, du meilleur score au moins bon.
+        """
+        rows = await self._db.fetch_all(
+            f"""SELECT e.from_id, e.to_id, e.score::float AS score
+                FROM transition_edges(
+                    %(user_id)s::uuid,
+                    ARRAY(SELECT t.id FROM track t WHERE {_MINE_SQL} OR t.id = ANY(%(include)s::uuid[])),
+                    %(tolerance)s::numeric) e
+                ORDER BY e.from_id, e.score DESC, e.to_id""",
+            {"user_id": user_id, "include": include, "tolerance": bpm_tolerance, "only_mine": only_mine},
+        )
+        graph: dict[UUID, list[tuple[UUID, float]]] = {}
+        for r in rows:
+            graph.setdefault(r["from_id"], []).append((r["to_id"], r["score"]))
+        return graph
+
+    async def transitions_between(
+        self, user_id: UUID, track_ids: list[UUID], bpm_tolerance: float
+    ) -> dict[tuple[UUID, UUID], ScoredTransition]:
+        """Enchaînements compatibles entre ces morceaux (dans les deux sens), par paire (de, vers)."""
+        rows = await self._db.fetch_all(
+            """SELECT * FROM transition_edges(%(user_id)s::uuid, %(ids)s::uuid[], %(tolerance)s::numeric)""",
+            {"user_id": user_id, "ids": track_ids, "tolerance": bpm_tolerance},
+        )
+        return {
+            (r["from_id"], r["to_id"]): ScoredTransition(_compatible_transition(r), float(r["score"]))
+            for r in rows
+        }
+
+    async def by_ids(self, user_id: UUID, track_ids: list[UUID]) -> dict[UUID, CatalogRow]:
+        """Ces morceaux, avec les valeurs vues par l'utilisateur, par identifiant (les inconnus manquent)."""
+        rows = await self._db.fetch_all(
+            f"""SELECT {TRACK_COLUMNS_SQL}
+                FROM track t
+                LEFT JOIN effective_features(%(user_id)s::uuid) f ON f.track_id = t.id
+                WHERE t.id = ANY(%(ids)s::uuid[])""",
+            {"user_id": user_id, "ids": track_ids},
+        )
+        return {r["id"]: CatalogRow(**r) for r in rows}
 
     async def set_favorite(self, user_id: UUID, track_id: UUID, favorite: bool) -> None:
         """Marque ou démarque le morceau comme favori de l'utilisateur (sans effet s'il l'est déjà)."""
@@ -399,15 +452,15 @@ class TrackRepository:
         return row["id"]
 
 
-def _bridge_leg(row: dict[str, Any], side: str) -> TransitionRow:
-    """Un des deux enchaînements d'un pont (colonnes `in_…` ou `out_…`), toujours compatible."""
+def _compatible_transition(row: dict[str, Any], prefix: str = "") -> TransitionRow:
+    """Enchaînement compatible lu dans les colonnes d'une ligne (`in_…` / `out_…` pour un pont)."""
     return TransitionRow(
-        key_move=row[f"{side}_key_move"],
-        key_distance=row[f"{side}_key_distance"],
-        half_double=row[f"{side}_half_double"],
-        bpm_diff=float(row[f"{side}_bpm_diff"]),
-        bpm_change=float(row[f"{side}_bpm_change"]),
+        key_move=row[f"{prefix}key_move"],
+        key_distance=row[f"{prefix}key_distance"],
+        half_double=row[f"{prefix}half_double"],
+        bpm_diff=float(row[f"{prefix}bpm_diff"]),
+        bpm_change=float(row[f"{prefix}bpm_change"]),
         tempo_ok=True,
-        same_mode=row[f"{side}_key_move"] in _SAME_MODE_MOVES,
+        same_mode=row[f"{prefix}key_move"] in _SAME_MODE_MOVES,
         compatible=True,
     )

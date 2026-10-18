@@ -29,6 +29,10 @@ class OrderMismatchError(Exception):
     """Le nouvel ordre ne contient pas exactement les éléments actuels (page périmée : recharger)."""
 
 
+# Position au-delà de toute playlist : le morceau est placé en fin (insert_items s'arrête à la fin).
+END_OF_PLAYLIST = 2_147_483_647
+
+
 class PlaylistEditor:
     """Crée, renomme, remplit, duplique et supprime les playlists d'un utilisateur."""
 
@@ -58,15 +62,22 @@ class PlaylistEditor:
         self, owner_id: UUID, playlist_id: UUID, track_id: UUID, position: int | None = None
     ) -> tuple[int, int]:
         """Ajoute un morceau en fin, ou à `position` (les suivants descendent) ; renvoie (élément, place)."""
+        at = END_OF_PLAYLIST if position is None else position
+        return (await self.insert_tracks(owner_id, playlist_id, [track_id], at))[0]
+
+    async def insert_tracks(
+        self, owner_id: UUID, playlist_id: UUID, track_ids: list[UUID], position: int
+    ) -> list[tuple[int, int]]:
+        """Insère ces morceaux, dans l'ordre, à `position` (tout ou rien) ; renvoie (élément, place)."""
         async with self._db.transaction() as tx:
             repo = PlaylistRepository(tx)
             await editable_playlist(repo, owner_id, playlist_id)
-            if not await TrackRepository(tx).exists(track_id):
-                raise TrackMissingError("Morceau inconnu")
+            tracks = TrackRepository(tx)
+            for track_id in dict.fromkeys(track_ids):
+                if not await tracks.exists(track_id):
+                    raise TrackMissingError("Morceau inconnu")
             await repo.lock(playlist_id)
-            if position is None:
-                return await repo.append_item(playlist_id, track_id)
-            return await repo.insert_item(playlist_id, track_id, position)
+            return await repo.insert_items(playlist_id, track_ids, position)
 
     async def reorder(self, owner_id: UUID, playlist_id: UUID, item_ids: list[int]) -> None:
         """Remplace l'ordre des morceaux ; la liste doit contenir exactement les éléments actuels."""

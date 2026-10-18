@@ -140,39 +140,30 @@ class PlaylistRepository:
         """Verrouille la playlist jusqu'à la fin de la transaction, pour ajouter sans conflit de position."""
         await self._db.fetch_one("SELECT 1 FROM playlist WHERE id = %(id)s FOR UPDATE", {"id": playlist_id})
 
-    async def append_item(self, playlist_id: UUID, track_id: UUID) -> tuple[int, int]:
-        """Ajoute le morceau en fin de playlist ; renvoie (identifiant de l'élément, position)."""
-        row = await self._db.fetch_one(
-            """INSERT INTO playlist_item (playlist_id, track_id, position)
-               SELECT %(id)s, %(track_id)s,
-                      COALESCE((SELECT max(position) + 1 FROM playlist_item WHERE playlist_id = %(id)s), 0)
-               RETURNING id, position""",
-            {"id": playlist_id, "track_id": track_id},
-        )
-        assert row is not None
-        await self._touch(playlist_id)
-        return row["id"], row["position"]
+    async def insert_items(
+        self, playlist_id: UUID, track_ids: list[UUID], position: int
+    ) -> list[tuple[int, int]]:
+        """Insère ces morceaux, dans l'ordre, à cette position (au plus en fin) ; les suivants descendent.
 
-    async def insert_item(self, playlist_id: UUID, track_id: UUID, position: int) -> tuple[int, int]:
-        """Insère le morceau à cette position (au plus en fin) ; les suivants descendent.
-
-        Unicité des positions vérifiée au commit (contrainte DEFERRABLE) : à appeler sous `lock`.
+        Renvoie (élément, position) de chaque morceau inséré. Unicité des positions vérifiée au commit
+        (contrainte DEFERRABLE) : à appeler sous `lock`.
         """
         await self._db.fetch_one(
-            """UPDATE playlist_item SET position = position + 1
+            """UPDATE playlist_item SET position = position + %(n)s
                WHERE playlist_id = %(id)s AND position >= %(position)s""",
-            {"id": playlist_id, "position": position},
+            {"id": playlist_id, "position": position, "n": len(track_ids)},
         )
-        row = await self._db.fetch_one(
+        rows = await self._db.fetch_all(
             """INSERT INTO playlist_item (playlist_id, track_id, position)
-               SELECT %(id)s, %(track_id)s,
+               SELECT %(id)s, t.track_id,
                       LEAST(%(position)s, (SELECT count(*) FROM playlist_item WHERE playlist_id = %(id)s))
+                      + (t.ord - 1)::integer
+               FROM unnest(%(track_ids)s::uuid[]) WITH ORDINALITY AS t(track_id, ord)
                RETURNING id, position""",
-            {"id": playlist_id, "track_id": track_id, "position": position},
+            {"id": playlist_id, "track_ids": track_ids, "position": position},
         )
-        assert row is not None
         await self._touch(playlist_id)
-        return row["id"], row["position"]
+        return sorted(((r["id"], r["position"]) for r in rows), key=lambda item: item[1])
 
     async def item_ids(self, playlist_id: UUID) -> list[int]:
         """Identifiants des éléments de la playlist, dans l'ordre."""

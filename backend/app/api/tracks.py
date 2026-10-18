@@ -15,6 +15,7 @@ from app.api.deps import get_current_user_id, get_db, get_preview_service, get_q
 from app.api.transitions import RatingOut, Transition
 from app.domain.camelot import CamelotKey
 from app.services.preview import PreviewService
+from app.services.set_path import PathFinder
 from app.services.track_correction import (
     BPM_MAX,
     BPM_MIN,
@@ -131,6 +132,21 @@ class Bridge(BaseModel):
     outgoing_score: float
 
 
+class SetPathStep(BaseModel):
+    """Un enchaînement d'un chemin, et son score."""
+
+    transition: Transition
+    score: float
+
+
+class SetPathOut(BaseModel):
+    """Un chemin de A à B : les morceaux entre les deux, chaque enchaînement et le plus faible des scores."""
+
+    tracks: list[CatalogTrack]
+    steps: list[SetPathStep]
+    score: float
+
+
 async def _ensure_exists(tracks: TrackRepository, track_id: UUID) -> None:
     """Lève une erreur 404 si le morceau n'existe pas."""
     if not await tracks.exists(track_id):
@@ -186,6 +202,32 @@ async def bridges(
         from_id, to_id, user_id=user_id, bpm_tolerance=bpm_tolerance, limit=limit, only_mine=scope == "mine"
     )
     return [Bridge.model_validate(asdict(r)) for r in rows]
+
+
+@router.get("/{from_id}/paths/{to_id}")
+async def paths(
+    from_id: UUID,
+    to_id: UUID,
+    tracks: Tracks,
+    user_id: CurrentUser,
+    scope: Literal["mine", "all"] = "mine",
+    bpm_tolerance: Annotated[float, Query(gt=0, le=0.2)] = DEFAULT_BPM_TOLERANCE,
+) -> list[SetPathOut]:
+    """Jusqu'à 3 chemins de 1 à 4 morceaux (les miens, ou tous avec scope=all) pour aller de A à B."""
+    await _ensure_exists(tracks, from_id)
+    await _ensure_exists(tracks, to_id)
+    found = await PathFinder(tracks).paths(user_id, from_id, to_id, bpm_tolerance, only_mine=scope == "mine")
+    return [
+        SetPathOut(
+            tracks=[CatalogTrack(**asdict(t)) for t in p.tracks],
+            steps=[
+                SetPathStep(transition=Transition(**asdict(s.transition)), score=s.score)
+                for s in p.transitions
+            ],
+            score=p.score,
+        )
+        for p in found
+    ]
 
 
 @router.get("/{track_id}")

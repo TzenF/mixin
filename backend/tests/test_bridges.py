@@ -1,4 +1,4 @@
-"""Morceau pont (fonction SQL bridge_tracks) et route GET /tracks/{a}/bridges/{b}."""
+"""Morceau pont (SQL bridge_tracks) et chemin entre deux morceaux (SQL transition_edges, routes associées)."""
 
 import uuid
 from collections.abc import Iterator
@@ -74,3 +74,23 @@ def test_bridges_unknown_track(logged_in_client: TestClient, bridge_tracks: dict
 
 def test_bridges_require_a_session(client: TestClient) -> None:
     assert client.get(f"/tracks/{uuid.uuid4()}/bridges/{uuid.uuid4()}").status_code == 401
+
+
+def test_paths_between_two_tracks(
+    logged_in_client: TestClient, bridge_tracks: dict[str, uuid.UUID], test_prefix: str
+) -> None:
+    a, b = bridge_tracks["A"], bridge_tracks["B"]
+    resp = logged_in_client.get(f"/tracks/{a}/paths/{b}", params={"scope": "mine"})
+    assert resp.status_code == 200
+    body = resp.json()
+    # Les morceaux de la base de dev peuvent aussi former des chemins : on ne regarde que ceux du test.
+    ours = [p for p in body if all(t["title"].startswith(test_prefix) for t in p["tracks"])]
+    assert [[t["title"].removeprefix(f"{test_prefix} ") for t in p["tracks"]] for p in ours][0] == ["P1"]
+    first = ours[0]
+    assert len(first["steps"]) == 2 and all(s["transition"]["compatible"] for s in first["steps"])
+    assert first["score"] == min(s["score"] for s in first["steps"])
+    assert logged_in_client.get(f"/tracks/{a}/paths/{uuid.uuid4()}").status_code == 404
+
+
+def test_paths_require_a_session(client: TestClient) -> None:
+    assert client.get(f"/tracks/{uuid.uuid4()}/paths/{uuid.uuid4()}").status_code == 401

@@ -107,6 +107,14 @@ export class PlaylistService {
     });
   }
 
+  /** Insère plusieurs morceaux d'un coup (tout ou rien), dans l'ordre, à partir de `position`. */
+  insertTracks(playlistId: string, trackIds: string[], position: number): Observable<AddedItem[]> {
+    return this.http.post<AddedItem[]>(
+      `/api/playlists/${encodeURIComponent(playlistId)}/items/batch`,
+      { track_ids: trackIds, position },
+    );
+  }
+
   /** Duplique une de mes playlists (même importée) en une playlist modifiable « X (copie) ». */
   copy(playlistId: string): Observable<PlaylistSummary> {
     return this.http.post<PlaylistSummary>(

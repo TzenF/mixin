@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Bridge } from '../../../core/api/catalog.service';
+import { Bridge, CatalogTrack, SetPath } from '../../../core/api/catalog.service';
 import { Transition } from '../../../core/api/playlist.service';
 import { AudioPlayerService } from '../../../core/audio-player.service';
 import { FakeAudioPlayerService } from '../../../core/audio-player.service.fake';
@@ -30,6 +30,32 @@ const BRIDGE: Bridge = {
   incoming_score: 0.9,
   outgoing: { ...LEG, key_move: 'diagonal', same_mode: false },
   outgoing_score: 0.8,
+};
+
+/** Morceau d'un chemin. */
+function pathTrack(id: string, title: string): CatalogTrack {
+  return {
+    id,
+    title,
+    artists: ['Artiste'],
+    bpm: 122,
+    camelot: '7A',
+    bpm_source: 'essentia',
+    key_source: 'essentia',
+    key_confidence: 0.9,
+    analysis_status: 'done',
+    favorite: false,
+    mine: true,
+  };
+}
+const PATH: SetPath = {
+  tracks: [pathTrack('x', 'Premier'), pathTrack('y', 'Second')],
+  steps: [
+    { transition: LEG, score: 0.9 },
+    { transition: { ...LEG, key_move: 'energy_shift' }, score: 0.5 },
+    { transition: LEG, score: 0.9 },
+  ],
+  score: 0.5,
 };
 
 describe('BridgeFinderComponent', () => {
@@ -109,6 +135,43 @@ describe('BridgeFinderComponent', () => {
 
     expect(inserted).toHaveBeenCalledTimes(1);
     expect(all(fixture, 'bridges').length).toBe(0); // refermé
+  });
+
+  it('sans pont, cherche un chemin et insère tous ses morceaux', async () => {
+    const fixture = await render(['y']);
+    const inserted = vi.fn();
+    fixture.componentInstance.inserted.subscribe(inserted);
+    await open(fixture, []);
+
+    all(fixture, 'find-path')[0].click();
+    const req = http.expectOne((r) => r.url === '/api/tracks/a/paths/b');
+    expect(req.request.params.get('scope')).toBe('mine');
+    req.flush([PATH]);
+    fixture.detectChanges();
+
+    const text = all(fixture, 'path')[0].textContent ?? '';
+    expect(text).toContain('Premier');
+    expect(text).toContain("Saut de 2 (montée d'énergie)");
+    expect(text).toContain('déjà dans la playlist'); // « Second »
+    all(fixture, 'insert-path')[0].click();
+    const insert = http.expectOne('/api/playlists/set/items/batch');
+    expect(insert.request.body).toEqual({ track_ids: ['x', 'y'], position: 2 });
+    insert.flush([
+      { item_id: 9, position: 2 },
+      { item_id: 10, position: 3 },
+    ]);
+
+    expect(inserted).toHaveBeenCalledTimes(1);
+  });
+
+  it('dit quand il n’y a aucun chemin', async () => {
+    const fixture = await render();
+    await open(fixture, []);
+    all(fixture, 'find-path')[0].click();
+    http.expectOne((r) => r.url === '/api/tracks/a/paths/b').flush([]);
+    fixture.detectChanges();
+
+    expect(all(fixture, 'no-path').length).toBe(1);
   });
 
   it('dit quand aucun morceau ne fait le pont, et cherche ailleurs sur demande', async () => {

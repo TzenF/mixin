@@ -120,6 +120,13 @@ class AddedItem(BaseModel):
     position: int
 
 
+class TracksToInsert(BaseModel):
+    """Morceaux à insérer ensemble, dans l'ordre, à partir de `position` (un chemin entre deux morceaux)."""
+
+    track_ids: Annotated[list[UUID], Field(min_length=1, max_length=20)]
+    position: Annotated[int, Field(ge=0)]
+
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_playlist(body: PlaylistNameIn, editor: Editor, user_id: CurrentUser) -> PlaylistSummary:
     """Crée une playlist vide."""
@@ -146,6 +153,15 @@ async def add_track(playlist_id: UUID, body: TrackToAdd, editor: Editor, user_id
     """Ajoute un morceau (en fin, ou à `position`) ; 409 si playlist importée, 404 si morceau inconnu."""
     item_id, position = await editor.add_track(user_id, playlist_id, body.track_id, body.position)
     return AddedItem(item_id=item_id, position=position)
+
+
+@router.post("/{playlist_id}/items/batch", status_code=status.HTTP_201_CREATED)
+async def insert_tracks(
+    playlist_id: UUID, body: TracksToInsert, editor: Editor, user_id: CurrentUser
+) -> list[AddedItem]:
+    """Insère plusieurs morceaux d'un coup (tout ou rien) ; 409 si importée, 404 si morceau inconnu."""
+    added = await editor.insert_tracks(user_id, playlist_id, body.track_ids, body.position)
+    return [AddedItem(item_id=item_id, position=position) for item_id, position in added]
 
 
 @router.post("/{playlist_id}/copy", status_code=status.HTTP_201_CREATED)

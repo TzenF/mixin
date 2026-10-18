@@ -27,6 +27,63 @@
           <p class="hint" data-testid="no-bridge">
             Aucun morceau ne fait le pont{{ everywhere() ? '' : ' parmi tes morceaux' }}.
           </p>
+          @switch (pathState().kind) {
+            @case ('idle') {
+              <button
+                type="button"
+                class="secondary"
+                (click)="searchPaths()"
+                data-testid="find-path"
+              >
+                Chercher un chemin (2 à 4 morceaux)
+              </button>
+            }
+            @case ('loading') {
+              <p class="hint">Recherche d'un chemin…</p>
+            }
+            @case ('error') {
+              <p class="error" data-testid="path-error">{{ pathError() }}</p>
+            }
+            @case ('ready') {
+              @if (pathRows().length === 0) {
+                <p class="hint" data-testid="no-path">Aucun chemin de 4 morceaux ou moins.</p>
+              }
+              @for (row of pathRows(); track $index) {
+                <div class="path" data-testid="path">
+                  <ol>
+                    @for (item of row.tracks; track item.track.id; let i = $index) {
+                      <li class="step hint">{{ row.steps[i] }}</li>
+                      <li class="bridge">
+                        <app-play-button
+                          [trackId]="item.track.id"
+                          [noPreview]="item.track.analysis_status === 'no_preview'"
+                        />
+                        <span class="what">
+                          <span class="title">{{ item.track.title }}</span>
+                          <span class="hint">
+                            {{ item.track.artists.join(', ') }} ·
+                            {{ item.track.bpm | number: '1.1-1' }} BPM · {{ item.track.camelot }}
+                            @if (item.inPlaylist) {
+                              · déjà dans la playlist
+                            }
+                          </span>
+                        </span>
+                      </li>
+                    }
+                    <li class="step hint">{{ row.steps[row.steps.length - 1] }}</li>
+                  </ol>
+                  <button
+                    type="button"
+                    [disabled]="inserting()"
+                    (click)="insertPath(row.path)"
+                    data-testid="insert-path"
+                  >
+                    Insérer ces {{ row.tracks.length }} morceaux
+                  </button>
+                </div>
+              }
+            }
+          }
         }
         <ul>
           @for (row of rows(); track row.bridge.track_id) {

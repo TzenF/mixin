@@ -56,6 +56,16 @@ export interface Bridge {
   outgoing_score: number;
 }
 
+/** Un chemin de A à B en plusieurs morceaux (voir backend/app/api/tracks.py). */
+export interface SetPath {
+  /** Les morceaux entre A et B, dans l'ordre. */
+  tracks: CatalogTrack[];
+  /** Chaque enchaînement : A → 1er morceau, …, dernier morceau → B. */
+  steps: { transition: Transition; score: number }[];
+  /** Le plus faible des enchaînements. */
+  score: number;
+}
+
 /** Ma note d'un enchaînement A → B (1 à 5) et mon commentaire éventuel. */
 export interface TransitionRating {
   rating: number;
@@ -189,6 +199,14 @@ export class CatalogService {
     return this.http.get<Bridge[]>(
       `/api/tracks/${encodeURIComponent(fromId)}/bridges/${encodeURIComponent(toId)}`,
       { params },
+    );
+  }
+
+  /** Jusqu'à 3 chemins de 1 à 4 morceaux pour aller de `fromId` à `toId`. */
+  paths(fromId: string, toId: string, scope: 'mine' | 'all'): Observable<SetPath[]> {
+    return this.http.get<SetPath[]>(
+      `/api/tracks/${encodeURIComponent(fromId)}/paths/${encodeURIComponent(toId)}`,
+      { params: new HttpParams().set('scope', scope) },
     );
   }
 

@@ -213,6 +213,34 @@ def test_insert_a_track_at_a_position(
     assert logged_in_client.post(imported, json={"track_id": e, "position": 0}).status_code == 409
 
 
+def test_insert_several_tracks_at_once(
+    logged_in_client: TestClient, playlists: dict[str, str], test_prefix: str
+) -> None:
+    url = f"/playlists/{playlists['mine']}/items/batch"
+    a, e = _track_id(test_prefix, "A"), _track_id(test_prefix, "E")
+
+    resp = logged_in_client.post(url, json={"track_ids": [e, a], "position": 1})
+    assert resp.status_code == 201
+    assert [i["position"] for i in resp.json()] == [1, 2]
+    items = _detail(logged_in_client, playlists["mine"])["items"]
+    assert [i["track"]["title"].removeprefix(f"{test_prefix} ") for i in items] == [
+        "A",
+        "E",
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+    ]
+
+    unknown = logged_in_client.post(url, json={"track_ids": [a, str(uuid.uuid4())], "position": 0})
+    assert unknown.status_code == 404
+    assert len(_detail(logged_in_client, playlists["mine"])["items"]) == 7  # tout ou rien
+    assert logged_in_client.post(url, json={"track_ids": [], "position": 0}).status_code == 422
+    imported = f"/playlists/{playlists['imported']}/items/batch"
+    assert logged_in_client.post(imported, json={"track_ids": [a], "position": 0}).status_code == 409
+
+
 def test_imported_playlists_are_read_only(
     logged_in_client: TestClient, playlists: dict[str, str], test_prefix: str
 ) -> None:
